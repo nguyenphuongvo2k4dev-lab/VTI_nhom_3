@@ -1,4 +1,5 @@
 import React from 'react';
+import { useStore } from '../../store/useStore';
 
 interface StudentMeterModalProps {
   isOpen: boolean;
@@ -6,6 +7,7 @@ interface StudentMeterModalProps {
 }
 
 export const StudentMeterModal: React.FC<StudentMeterModalProps> = ({ isOpen, onClose }) => {
+  const { studentInfo } = useStore();
   if (!isOpen) return null;
 
   return (
@@ -17,7 +19,7 @@ export const StudentMeterModal: React.FC<StudentMeterModalProps> = ({ isOpen, on
               <span className="material-symbols-outlined text-[22px]">speed</span>
             </div>
             <div>
-              <h3 className="text-base font-bold text-on-surface">Chỉ Số Công Tơ IoT Phòng 402</h3>
+              <h3 className="text-base font-bold text-on-surface">Chỉ Số Công Tơ IoT {studentInfo.roomNumber ? `Phòng ${studentInfo.roomNumber}` : 'Khu Vực KTX'}</h3>
               <p className="text-xs text-outline">Đồng bộ tự động qua Modbus-RTU 30s/lần</p>
             </div>
           </div>

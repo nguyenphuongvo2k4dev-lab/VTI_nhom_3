@@ -103,12 +103,56 @@ export const api = {
     return res.json();
   },
 
+  async registerUser(userData: {
+    fullName: string;
+    studentId: string;
+    email: string;
+    phone: string;
+    university?: string;
+    dormArea?: string;
+    roomType?: string;
+    password?: string;
+  }) {
+    try {
+      const res = await fetch('/api/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(userData)
+      });
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch {
+      // Offline fallback
+    }
+    return { success: true };
+  },
+
+  async approveStudentRoom() {
+    try {
+      const res = await fetch('/api/student/approve', { method: 'POST' });
+      if (res.ok) return await res.json();
+    } catch {
+      // Offline fallback
+    }
+    return { success: true };
+  },
+
   async getStudentInfo() {
     try {
       const res = await fetch('/api/student/info');
       if (!res.ok) throw new Error('Failed to fetch student info');
       return await res.json();
     } catch {
+      if (typeof window !== 'undefined') {
+        try {
+          const raw = localStorage.getItem('smartdorm_current_user');
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (parsed.studentInfo) return parsed.studentInfo;
+          }
+        } catch {}
+      }
       return {
         fullName: 'Đặng Hoàng Nam', studentId: '22120045', faculty: 'Khoa CNTT & Truyền thông',
         className: 'CNTT-K22A', cohort: 'K22', phone: '0912 345 678',

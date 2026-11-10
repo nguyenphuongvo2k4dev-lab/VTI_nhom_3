@@ -2,6 +2,12 @@ import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
+import {
+  DEMO_STUDENT,
+  createPendingStudentInfo,
+  createApprovedStudentInfo,
+  createInitialStudentBill
+} from './src/store/studentDefaults';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -400,42 +406,16 @@ let studentTickets = [
   }
 ];
 
+let currentStudentInfo = { ...DEMO_STUDENT };
+
 app.get('/api/student/info', (req, res) => {
-  res.json({
-    fullName: 'Đặng Hoàng Nam',
-    studentId: '22120045',
-    faculty: 'Khoa CNTT & Truyền thông',
-    className: 'CNTT-K22A',
-    cohort: 'K22',
-    phone: '0912 345 678',
-    room: 'P.402 - Nhà B2 (Khu B)',
-    roomNumber: '402',
-    building: 'B2',
-    zone: 'Khu B (Nam sinh viên)',
-    bedSlot: 'G1',
-    isLeader: true,
-    contract: {
-      id: 'HD-2024-8841',
-      daysLeft: 74,
-      expiryDate: '31/12/2024',
-      renewalStartDate: '01/12/2024'
-    },
-    roommates: [
-      { id: '1', bed: 'G1', name: 'Đặng Hoàng Nam', role: 'Bạn • Trưởng phòng', faculty: 'Khoa CNTT & Truyền thông • K22', phone: '0912 345 678', inRoom: true, isMe: true },
-      { id: '2', bed: 'G2', name: 'Nguyễn Tiến Đạt', role: 'Sinh viên', faculty: 'Khoa Điện tử Viễn thông • K22', phone: '0984 112 334', inRoom: true },
-      { id: '3', bed: 'G3', name: 'Lê Bảo Minh', role: 'Sinh viên', faculty: 'Khoa Kinh tế Đối ngoại • K23', phone: '0905 889 211', inRoom: true },
-      { id: '4', bed: 'G4', name: 'Phạm Tuấn Hưng', role: 'Tân sinh viên', faculty: 'Khoa Khoa học Máy tính • K24', phone: '0977 441 902', inRoom: false }
-    ],
-    roomSpecs: {
-      airConditioner: '12.000 BTU Inverter',
-      waterHeater: 'Ariston 30L',
-      electricMeter: '1,420 kWh (IoT)',
-      waterMeter: '112 m³ (IoT)'
-    }
-  });
+  res.json(currentStudentInfo);
 });
 
 app.get('/api/student/bills', (req, res) => {
+  if (currentStudentInfo.status === 'pending') {
+    return res.json([]);
+  }
   res.json(studentBills);
 });
 
@@ -450,6 +430,9 @@ app.post('/api/student/pay-bill', (req, res) => {
 });
 
 app.get('/api/student/tickets', (req, res) => {
+  if (currentStudentInfo.status === 'pending') {
+    return res.json([]);
+  }
   res.json(studentTickets);
 });
 
@@ -552,6 +535,59 @@ app.post('/api/users', (req, res) => {
 
   auditLogs.unshift(newLog);
   res.json({ success: true, user: { fullName, email, role, room, studentId }, log: newLog });
+});
+
+app.post('/api/register', (req, res) => {
+  const { fullName, studentId, email, phone, university, dormArea, roomType } = req.body;
+  if (!fullName || !studentId || !email) {
+    return res.status(400).json({ error: 'Vui lòng cung cấp đầy đủ thông tin đăng ký.' });
+  }
+
+  const newLog: AuditLog = {
+    id: `LOG-00${auditLogs.length + 1}`,
+    time: new Date().toLocaleTimeString('vi-VN'),
+    date: new Date().toLocaleDateString('vi-VN'),
+    user: {
+      name: fullName,
+      role: 'Tân sinh viên',
+      email: email,
+      avatarInitials: fullName.split(' ').filter(Boolean).map((n: string) => n[0]).join('').slice(-2).toUpperCase() || 'SV',
+      avatarBg: 'bg-primary'
+    },
+    action: 'Đăng ký tài khoản KTX trực tuyến',
+    actionType: 'create',
+    detail: `Tân sinh viên tạo tài khoản mới: ${fullName} (MSSV: ${studentId}) - Khu ${dormArea || 'B'}`,
+    targetId: studentId,
+    ip: (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '127.0.0.1',
+    device: (req.headers['user-agent'] as string) || 'Web Browser',
+    status: 'success',
+    statusText: 'Đã kích hoạt',
+    payload: { fullName, studentId, email, phone, university, dormArea, roomType }
+  };
+
+  currentStudentInfo = createPendingStudentInfo({
+    fullName,
+    studentId,
+    email,
+    phone,
+    university,
+    dormArea,
+    roomType
+  });
+
+  auditLogs.unshift(newLog);
+  res.json({
+    success: true,
+    message: 'Đăng ký tài khoản sinh viên thành công.',
+    user: { fullName, studentId, email, phone, university, dormArea, roomType },
+    log: newLog
+  });
+});
+
+app.post('/api/student/approve', (req, res) => {
+  currentStudentInfo = createApprovedStudentInfo(currentStudentInfo);
+  studentBills = [createInitialStudentBill(currentStudentInfo.studentId)];
+  res.json({ success: true, studentInfo: currentStudentInfo, bills: studentBills });
 });
 
 async function startServer() {

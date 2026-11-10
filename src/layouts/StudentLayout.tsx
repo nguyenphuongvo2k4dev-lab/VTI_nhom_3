@@ -4,11 +4,13 @@ import { useStore } from '../store/useStore';
 import { StudentSidebar } from '../components/student/StudentSidebar';
 import { StudentHeader } from '../components/student/StudentHeader';
 import { StudentAiChatDrawer } from '../components/student/StudentAiChatDrawer';
-import { StudentReportFaultModal } from '../components/modals/StudentReportFaultModal';
-import { StudentPaymentModal } from '../components/modals/StudentPaymentModal';
-import { StudentRoomRulesModal } from '../components/modals/StudentRoomRulesModal';
-import { StudentMeterModal } from '../components/modals/StudentMeterModal';
-import { StudentOvernightLeaveModal } from '../components/modals/StudentOvernightLeaveModal';
+import {
+  StudentReportFaultModal,
+  StudentPaymentModal,
+  StudentRoomRulesModal,
+  StudentMeterModal,
+  StudentOvernightLeaveModal
+} from '../components/modals';
 
 export const StudentLayout: React.FC = () => {
   const navigate = useNavigate();

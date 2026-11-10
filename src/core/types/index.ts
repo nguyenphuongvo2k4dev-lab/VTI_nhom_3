@@ -29,17 +29,23 @@ export interface StudentInfo {
   className: string;
   cohort: string;
   phone: string;
+  email?: string;
+  status: 'active' | 'pending' | 'suspended';
   room: string;
   roomNumber: string;
   building: string;
   zone: string;
   bedSlot: string;
   isLeader: boolean;
+  preferredArea?: string;
+  preferredRoomType?: string;
+  registrationDate?: string;
   contract: {
     id: string;
     daysLeft: number;
     expiryDate: string;
     renewalStartDate: string;
+    status?: 'active' | 'pending' | 'expired';
   };
   roommates: Roommate[];
   roomSpecs: {

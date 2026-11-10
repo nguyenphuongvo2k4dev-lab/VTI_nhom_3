@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { api } from '../../core/api';
 import { eventBus, EVENTS } from '../../core/bus';
+import { useStore } from '../../store/useStore';
 
 interface StudentPaymentModalProps {
   isOpen: boolean;
@@ -17,6 +18,7 @@ export const StudentPaymentModal: React.FC<StudentPaymentModalProps> = ({
   billAmount = 685000,
   billMonth = 'Tháng 10/2024'
 }) => {
+  const { studentInfo } = useStore();
   const [method, setMethod] = useState<'vnpay' | 'momo' | 'napas'>('vnpay');
   const [processing, setProcessing] = useState(false);
 
@@ -47,7 +49,7 @@ export const StudentPaymentModal: React.FC<StudentPaymentModalProps> = ({
             </div>
             <div>
               <h3 className="text-base font-bold text-on-surface">Thanh Toán Hóa Đơn KTX</h3>
-              <p className="text-xs text-outline">{billMonth} • Phòng 402 Nhà B2</p>
+              <p className="text-xs text-outline">{billMonth} • {studentInfo.roomNumber ? `Phòng ${studentInfo.roomNumber} Nhà ${studentInfo.building}` : studentInfo.zone}</p>
             </div>
           </div>
           <button onClick={onClose} className="p-1 rounded-lg hover:bg-surface-container text-on-surface-variant">

@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { PortalMode } from '../../core/types';
+import { useStore } from '../../store/useStore';
 
 interface StudentHeaderProps {
   onToggleMobileMenu: () => void;
@@ -11,7 +13,27 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
   onToggleMobileMenu,
   onOpenNotifications,
 }) => {
+  const navigate = useNavigate();
+  const { studentInfo, logout } = useStore();
   const [profileDropdown, setProfileDropdown] = useState(false);
+
+  // Compute initials from current student full name
+  const initials = studentInfo?.fullName
+    ? studentInfo.fullName
+        .trim()
+        .split(' ')
+        .filter(Boolean)
+        .map((n) => n[0])
+        .join('')
+        .slice(-2)
+        .toUpperCase()
+    : 'SV';
+
+  const handleLogout = () => {
+    setProfileDropdown(false);
+    logout();
+    navigate('/login');
+  };
 
   return (
     <header className="fixed top-0 left-0 lg:left-72 right-0 h-16 bg-surface-container-lowest/90 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-40 px-4 sm:px-8 flex items-center justify-between gap-4 border-b border-outline-variant/30">
@@ -44,8 +66,6 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
           <span>Học kỳ 1 - 2024/2025</span>
         </div>
 
-        {/* Semester badge */}
-
         {/* Notifications trigger */}
         <button
           onClick={onOpenNotifications}
@@ -65,14 +85,14 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
             className="flex items-center gap-2.5 pl-2 sm:pl-3 border-l border-outline-variant/40 cursor-pointer select-none group"
           >
             <div className="flex flex-col text-right hidden sm:flex">
-              <span className="text-xs font-bold text-on-surface">Đặng Hoàng Nam</span>
+              <span className="text-xs font-bold text-on-surface">{studentInfo.fullName}</span>
               <span className="text-[11px] text-on-surface-variant">
-                MSSV: 22120045 • Khu Nhà B - P.402
+                MSSV: {studentInfo.studentId} • {studentInfo.roomNumber ? `P.${studentInfo.roomNumber}` : 'Chưa xếp phòng'}
               </span>
             </div>
 
             <div className="w-9 h-9 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-xs ring-2 ring-primary/20 shrink-0">
-              HN
+              {initials}
             </div>
             <span className="material-symbols-outlined text-outline text-[18px]">expand_more</span>
           </div>
@@ -81,20 +101,37 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
           {profileDropdown && (
             <div className="absolute right-0 top-full mt-2 w-56 py-1.5 bg-surface-container-lowest rounded-xl shadow-xl border border-outline-variant/30 z-50">
               <div className="px-4 py-2 border-b border-surface-container-high">
-                <p className="text-xs font-bold text-on-surface">Đặng Hoàng Nam</p>
-                <p className="text-[11px] text-outline font-mono">MSSV: 22120045</p>
-                <span className="inline-block mt-1 text-[10px] px-2 py-0.5 rounded-full bg-primary-fixed text-primary font-bold">
-                  Phòng 402 - Tòa B2 (Trưởng phòng)
+                <p className="text-xs font-bold text-on-surface">{studentInfo.fullName}</p>
+                <p className="text-[11px] text-outline font-mono">MSSV: {studentInfo.studentId}</p>
+                <span className={`inline-block mt-1 text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                  studentInfo.roomNumber ? 'bg-primary-fixed text-primary' : 'bg-amber-500/20 text-amber-700 dark:text-amber-300'
+                }`}>
+                  {studentInfo.roomNumber
+                    ? `Phòng ${studentInfo.roomNumber} - Tòa ${studentInfo.building} (${studentInfo.isLeader ? 'Trưởng phòng' : 'Thành viên'})`
+                    : 'Chờ Ban Quản lý xếp phòng'}
                 </span>
               </div>
 
               <div className="py-1 text-xs text-on-surface">
                 <button
-                  onClick={() => setProfileDropdown(false)}
+                  onClick={() => {
+                    setProfileDropdown(false);
+                    navigate('/student/profile');
+                  }}
                   className="w-full text-left px-4 py-2 hover:bg-surface-container flex items-center gap-2"
                 >
                   <span className="material-symbols-outlined text-[18px] text-outline">account_circle</span>
                   Hồ sơ cá nhân
+                </button>
+                <button
+                  onClick={() => {
+                    setProfileDropdown(false);
+                    navigate('/student/room');
+                  }}
+                  className="w-full text-left px-4 py-2 hover:bg-surface-container flex items-center gap-2"
+                >
+                  <span className="material-symbols-outlined text-[18px] text-outline">meeting_room</span>
+                  Phòng ở hiện tại
                 </button>
                 <button
                   onClick={() => {
@@ -111,10 +148,7 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
               <div className="h-px bg-outline-variant/30 my-1" />
 
               <button
-                onClick={() => {
-                  setProfileDropdown(false);
-                  window.location.href = '/login';
-                }}
+                onClick={handleLogout}
                 className="w-full text-left px-4 py-2 text-xs font-semibold text-error hover:bg-error-container/40 flex items-center gap-2"
               >
                 <span className="material-symbols-outlined text-[18px]">logout</span>

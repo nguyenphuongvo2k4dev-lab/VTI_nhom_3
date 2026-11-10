@@ -5,12 +5,14 @@ import { Sidebar as AdminSidebar } from '../components/shell/Sidebar';
 import { TopHeader as AdminTopHeader } from '../components/shell/TopHeader';
 import { CommandPalette } from '../components/shell/CommandPalette';
 import { NotificationDrawer } from '../components/shell/NotificationDrawer';
-import { AddUserModal } from '../components/modals/AddUserModal';
-import { BackupModal } from '../components/modals/BackupModal';
-import { TariffEditModal } from '../components/modals/TariffEditModal';
-import { AuditDetailModal } from '../components/modals/AuditDetailModal';
-import { QuickConfigModal } from '../components/modals/QuickConfigModal';
-import { MaintenanceTicketModal } from '../components/modals/MaintenanceTicketModal';
+import {
+  AddUserModal,
+  BackupModal,
+  TariffEditModal,
+  AuditDetailModal,
+  QuickConfigModal,
+  MaintenanceTicketModal
+} from '../components/modals';
 import { MicroAppId } from '../core/types';
 
 export const AdminLayout: React.FC = () => {

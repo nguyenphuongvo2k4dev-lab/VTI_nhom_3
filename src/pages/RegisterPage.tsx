@@ -1,150 +1,148 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useStore } from '../store/useStore';
+import { api } from '../core/api';
 
 export const RegisterPage: React.FC = () => {
   const navigate = useNavigate();
-  const { login, lang, setLang, showToast } = useStore();
+  const { registerStudent, lang, setLang, showToast } = useStore();
 
-  // Form states
-  const [activeStep, setActiveStep] = useState<number>(1);
-  const [university, setUniversity] = useState('bk');
-  const [studentId, setStudentId] = useState('24120892');
-  const [checkingStudent, setCheckingStudent] = useState(false);
-  const [studentVerified, setStudentVerified] = useState(true);
-  const [cccd, setCccd] = useState('079204018992');
-  const [fullName, setFullName] = useState('NGUYỄN HOÀNG NAM');
-  const [birthDate, setBirthDate] = useState('18/09/2006');
-  const [gender, setGender] = useState<'male' | 'female'>('male');
-
-  // Group 2 states
-  const [email, setEmail] = useState('nam.nh24@student.edu.vn');
-  const [phone, setPhone] = useState('0987 654 321');
-  const [otpCount, setOtpCount] = useState<number>(58);
-  const [otpRunning, setOtpRunning] = useState<boolean>(true);
-  const [otpDigits, setOtpDigits] = useState<string[]>(['5', '8', '2', '9', '4', '1']);
-  const [password, setPassword] = useState('VnuDorm#2024Secure');
-  const [confirmPassword, setConfirmPassword] = useState('VnuDorm#2024Secure');
+  // Form states - clean and empty by default for normal user registration
+  const [fullName, setFullName] = useState('');
+  const [studentId, setStudentId] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [university, setUniversity] = useState('Trường Đại học Bách Khoa (HCMUT)');
+  const [dormArea, setDormArea] = useState<'A' | 'B' | 'C'>('B');
+  const [roomType, setRoomType] = useState('4-ac');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-
-  // Group 3 states
-  const [dormArea, setDormArea] = useState<'A' | 'B' | 'C'>('B');
-  const [roomType, setRoomType] = useState('6-ac');
-  const [priorityPolicies, setPriorityPolicies] = useState<{ [key: string]: boolean }>({
-    poor: false,
-    remote: false,
-    martyr: false,
-    none: true,
-  });
   const [agreeTerms, setAgreeTerms] = useState(true);
-  const [agreeNotify, setAgreeNotify] = useState(true);
+
+  // Status states
   const [submitting, setSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [submittedSuccess, setSubmittedSuccess] = useState(false);
 
-  // OTP Countdown timer
-  useEffect(() => {
-    let timer: NodeJS.Timeout;
-    if (otpRunning && otpCount > 0) {
-      timer = setInterval(() => {
-        setOtpCount((prev) => {
-          if (prev <= 1) {
-            setOtpRunning(false);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    }
-    return () => clearInterval(timer);
-  }, [otpRunning, otpCount]);
+  // Password strength calculation
+  const getPasswordStrength = () => {
+    if (!password) return { level: 0, text: 'Chưa nhập', color: 'bg-surface-variant' };
+    let score = 0;
+    if (password.length >= 6) score++;
+    if (password.length >= 8) score++;
+    if (/[A-Z]/.test(password) && /[a-z]/.test(password)) score++;
+    if (/[0-9]/.test(password)) score++;
+    if (/[^A-Za-z0-9]/.test(password)) score++;
 
-  const handleSendOtp = () => {
-    setOtpCount(60);
-    setOtpRunning(true);
-    showToast('Đã gửi mã xác thực OTP 6 số đến ' + phone);
+    if (score <= 2) return { level: 1, text: 'Yếu', color: 'bg-red-500' };
+    if (score <= 3) return { level: 2, text: 'Trung bình', color: 'bg-amber-500' };
+    if (score <= 4) return { level: 3, text: 'Mạnh', color: 'bg-blue-500' };
+    return { level: 4, text: 'Rất mạnh', color: 'bg-emerald-500' };
   };
 
-  const handleCheckStudent = () => {
-    if (!studentId.trim()) {
-      showToast('Vui lòng nhập Mã số sinh viên trước khi kiểm tra.');
+  const strength = getPasswordStrength();
+
+  const handleRegisterSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg(null);
+
+    const cleanName = fullName.trim();
+    const cleanStudentId = studentId.trim();
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanPhone = phone.trim();
+
+    // 1. Validation
+    if (!cleanName) {
+      setErrorMsg('Vui lòng nhập Họ và tên sinh viên.');
       return;
     }
-    setCheckingStudent(true);
-    setTimeout(() => {
-      setCheckingStudent(false);
-      setStudentVerified(true);
-      if (studentId === '24120892') {
-        setFullName('NGUYỄN HOÀNG NAM');
-        setCccd('079204018992');
-        setEmail('nam.nh24@student.edu.vn');
-      } else {
-        setFullName('TRẦN MINH QUÂN');
-        setCccd('079205001234');
-        setEmail(`${studentId.toLowerCase()}@student.edu.vn`);
-      }
-      showToast('Đã đối soát thành công dữ liệu tuyển sinh ĐHQG K24');
-    }, 700);
-  };
 
-  const handleOtpChange = (index: number, val: string) => {
-    if (val.length > 1) {
-      val = val.slice(-1);
+    if (!cleanStudentId) {
+      setErrorMsg('Vui lòng nhập Mã số sinh viên (MSSV).');
+      return;
     }
-    const newDigits = [...otpDigits];
-    newDigits[index] = val;
-    setOtpDigits(newDigits);
 
-    // Auto focus next input if digit typed
-    if (val && index < 5) {
-      const nextInput = document.getElementById(`otp-input-${index + 1}`);
-      if (nextInput) nextInput.focus();
+    if (cleanStudentId.length < 4) {
+      setErrorMsg('Mã số sinh viên không hợp lệ (tối thiểu 4 ký tự).');
+      return;
     }
-  };
 
-  const handleSaveDraft = () => {
-    const draft = {
-      university,
-      studentId,
-      cccd,
-      fullName,
-      birthDate,
-      gender,
-      email,
-      phone,
-      dormArea,
-      roomType,
-    };
-    try {
-      localStorage.setItem('smartdorm_registration_draft', JSON.stringify(draft));
-      showToast('Đã lưu bản nháp hồ sơ thành công vào bộ nhớ trình duyệt.');
-    } catch {
-      showToast('Bản nháp đã được lưu.');
+    if (!cleanEmail) {
+      setErrorMsg('Vui lòng nhập địa chỉ Email.');
+      return;
     }
-  };
 
-  const handleSubmit = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(cleanEmail)) {
+      setErrorMsg('Địa chỉ Email không đúng định dạng (ví dụ: nam.nh@student.edu.vn).');
+      return;
+    }
+
+    if (!cleanPhone) {
+      setErrorMsg('Vui lòng nhập số điện thoại di động.');
+      return;
+    }
+
+    const phoneRegex = /^[0-9]{9,11}$/;
+    if (!phoneRegex.test(cleanPhone.replace(/[\s.-]/g, ''))) {
+      setErrorMsg('Số điện thoại không hợp lệ (cần từ 9 đến 11 chữ số).');
+      return;
+    }
+
+    if (!password) {
+      setErrorMsg('Vui lòng thiết lập mật khẩu đăng nhập.');
+      return;
+    }
+
+    if (password.length < 6) {
+      setErrorMsg('Mật khẩu phải có độ dài tối thiểu từ 6 ký tự.');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setErrorMsg('Mật khẩu và xác nhận mật khẩu chưa trùng khớp.');
+      return;
+    }
 
     if (!agreeTerms) {
-      alert('Vui lòng đọc và tích chọn đồng ý tuân thủ Nội quy Ký túc xá ĐHQG.');
-      return;
-    }
-    if (password !== confirmPassword) {
-      alert('Mật khẩu và xác nhận mật khẩu chưa trùng khớp.');
+      setErrorMsg('Vui lòng tích chọn đồng ý với Nội quy và Quy chế Ký túc xá.');
       return;
     }
 
     setSubmitting(true);
-    setTimeout(() => {
+
+    try {
+      const userData = {
+        fullName: cleanName,
+        studentId: cleanStudentId,
+        email: cleanEmail,
+        phone: cleanPhone,
+        university,
+        dormArea,
+        roomType,
+        password,
+        createdAt: new Date().toISOString()
+      };
+
+      // Call API to record audit log in backend (if server is up)
+      await api.registerUser(userData);
+
+      // Register student in zustand store and browser localStorage
+      registerStudent(userData);
+
       setSubmitting(false);
       setSubmittedSuccess(true);
-      login('student', studentId || '24120892');
-      showToast('Kích hoạt tài khoản và nộp hồ sơ KTX K24 thành công!');
+      showToast('Đăng ký tài khoản thành công! Đang chuyển hướng vào cổng sinh viên...');
+
       setTimeout(() => {
         navigate('/student/overview');
-      }, 1000);
-    }, 1200);
+      }, 900);
+    } catch {
+      setSubmitting(false);
+      setErrorMsg('Có lỗi xảy ra khi tạo tài khoản. Vui lòng thử lại!');
+    }
   };
 
   return (
@@ -228,817 +226,522 @@ export const RegisterPage: React.FC = () => {
       </header>
 
       {/* Main Container */}
-      <main className="relative z-10 w-full flex-1 flex items-center justify-center py-8 px-4 md:px-6 lg:px-8">
-        <div className="flex flex-col w-full max-w-5xl mx-auto space-y-6">
-          {/* Progress Stepper */}
-          <div className="w-full bg-surface-container-lowest rounded-2xl p-4 sm:p-6 shadow-xs border border-outline-variant/30">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 relative">
-              {/* Step 1 */}
-              <div
-                onClick={() => setActiveStep(1)}
-                className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all ${
-                  activeStep === 1
-                    ? 'bg-surface-container-low border border-primary/30'
-                    : 'bg-surface opacity-80 hover:opacity-100'
-                }`}
-              >
-                <div
-                  className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0 shadow-xs ${
-                    activeStep === 1
-                      ? 'bg-primary text-on-primary'
-                      : 'bg-primary/20 text-primary'
-                  }`}
-                >
-                  1
-                </div>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-1">
-                    <span className="text-[10px] font-bold text-primary uppercase tracking-wider">
-                      {activeStep === 1 ? 'Bước 1 • Đang thực hiện' : 'Bước 1'}
+      <main className="relative z-10 w-full flex-1 flex items-center justify-center py-6 sm:py-10 px-4 md:px-6 lg:px-8">
+        <div className="flex flex-col w-full max-w-7xl mx-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
+            {/* LEFT COLUMN: Overview & Benefits */}
+            <div className="lg:col-span-5 flex flex-col justify-between rounded-2xl bg-surface-container-low p-6 lg:p-8 relative overflow-hidden shadow-xs border border-outline-variant/30">
+              <div className="absolute -top-24 -left-24 w-72 h-72 rounded-full bg-primary-fixed opacity-40 blur-3xl pointer-events-none" />
+              <div className="absolute -bottom-24 -right-24 w-80 h-80 rounded-full bg-secondary-fixed opacity-30 blur-3xl pointer-events-none" />
+
+              <div className="relative z-10 flex flex-col space-y-6">
+                <div className="flex items-start gap-2.5 bg-surface-container-lowest/90 backdrop-blur-xs p-3 rounded-xl shadow-xs border border-outline-variant/30">
+                  <span className="material-symbols-outlined text-primary text-[20px] shrink-0 mt-0.5">
+                    how_to_reg
+                  </span>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] uppercase text-primary font-bold tracking-wider">
+                      Cổng Đăng Ký Trực Tuyến • Năm học 2024 - 2025
                     </span>
-                  </div>
-                  <p className="text-sm font-bold text-on-surface truncate">Xác thực danh tính</p>
-                  <p className="text-xs text-on-surface-variant truncate">Dữ liệu học vụ & tài khoản</p>
-                </div>
-              </div>
-
-              {/* Step 2 */}
-              <div
-                onClick={() => setActiveStep(2)}
-                className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all ${
-                  activeStep === 2
-                    ? 'bg-surface-container-low border border-primary/30'
-                    : 'bg-surface opacity-80 hover:opacity-100'
-                }`}
-              >
-                <div
-                  className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${
-                    activeStep === 2
-                      ? 'bg-primary text-on-primary shadow-xs'
-                      : 'bg-surface-variant text-on-surface-variant'
-                  }`}
-                >
-                  2
-                </div>
-                <div className="min-w-0">
-                  <span className="text-[10px] font-bold text-outline uppercase tracking-wider">
-                    {activeStep === 2 ? 'Bước 2 • Đang thực hiện' : 'Bước 2'}
-                  </span>
-                  <p className="text-sm font-bold text-on-surface truncate">Bảo mật & MFA</p>
-                  <p className="text-xs text-on-surface-variant truncate">Xác thực 2 lớp VNU-ID</p>
-                </div>
-              </div>
-
-              {/* Step 3 */}
-              <div
-                onClick={() => setActiveStep(3)}
-                className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all ${
-                  activeStep === 3
-                    ? 'bg-surface-container-low border border-primary/30'
-                    : 'bg-surface opacity-80 hover:opacity-100'
-                }`}
-              >
-                <div
-                  className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${
-                    activeStep === 3
-                      ? 'bg-primary text-on-primary shadow-xs'
-                      : 'bg-surface-variant text-on-surface-variant'
-                  }`}
-                >
-                  3
-                </div>
-                <div className="min-w-0">
-                  <span className="text-[10px] font-bold text-outline uppercase tracking-wider">
-                    {activeStep === 3 ? 'Bước 3 • Đang thực hiện' : 'Bước 3'}
-                  </span>
-                  <p className="text-sm font-bold text-on-surface truncate">Đăng ký phòng lưu trú</p>
-                  <p className="text-xs text-on-surface-variant truncate">Hồ sơ & xếp phòng tự động</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Main Card Form */}
-          <div className="w-full bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant/30 p-6 sm:p-8 space-y-8">
-            {/* Header Section */}
-            <div className="space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary-fixed text-primary text-xs font-bold">
-                  <span className="material-symbols-outlined text-[16px]">school</span>
-                  <span>Năm học 2024 - 2025</span>
-                </div>
-                <span className="font-mono text-xs text-secondary bg-secondary-fixed/50 px-3 py-1 rounded-full font-semibold">
-                  Cổng tuyển sinh trực tuyến VNU-KTX
-                </span>
-              </div>
-
-              <div className="space-y-1">
-                <h1 className="text-2xl sm:text-3xl font-bold text-on-surface tracking-tight">
-                  Kích Hoạt Tài Khoản & Đăng Ký Lưu Trú KTX K24
-                </h1>
-                <p className="text-xs sm:text-sm text-on-surface-variant">
-                  Dành cho tân sinh viên và sinh viên ĐHQG chưa có tài khoản KTX SmartDorm chính thức.
-                </p>
-              </div>
-
-              {/* Alert Notice Banner */}
-              <div className="flex items-start gap-3 p-4 rounded-xl bg-surface-container-low border border-primary/20">
-                <span className="material-symbols-outlined text-primary text-[22px] shrink-0 mt-0.5">
-                  info
-                </span>
-                <div className="space-y-1">
-                  <p className="text-xs sm:text-sm text-primary font-bold">
-                    Lưu ý nhập liệu đối soát hồ sơ
-                  </p>
-                  <p className="text-xs text-on-surface-variant leading-relaxed">
-                    Sinh viên khóa mới cần chuẩn bị Mã số sinh viên (MSSV) và Số CMND/CCCD khớp với dữ liệu tuyển sinh đã nhập học để được tự động trích xuất thông tin.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Registration Multi-Section Form */}
-            <form onSubmit={handleSubmit} className="space-y-8">
-              {/* GROUP 1: Academic Identity */}
-              <div className="space-y-5">
-                <div className="flex items-center gap-3 pb-2 bg-gradient-to-r from-primary/10 via-transparent to-transparent p-3 rounded-xl border-l-4 border-primary">
-                  <span className="w-8 h-8 rounded-lg bg-primary text-on-primary flex items-center justify-center text-sm font-bold shadow-xs">
-                    1
-                  </span>
-                  <div>
-                    <h2 className="text-base sm:text-lg font-bold text-on-surface">
-                      Thông tin định danh học vụ
-                    </h2>
-                    <p className="text-xs text-on-surface-variant">
-                      Xác thực với Cơ sở Dữ liệu Đào tạo ĐHQG
+                    <p className="text-xs text-on-surface leading-tight mt-0.5">
+                      Đăng ký tài khoản nhanh chóng chỉ trong 1 bước để nhận mã phòng và kích hoạt lưu trú.
                     </p>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  {/* Trường thành viên */}
-                  <div className="space-y-1.5 md:col-span-2">
-                    <label className="block text-xs font-bold text-on-surface" htmlFor="university-select">
-                      Trường thành viên / Khoa trực thuộc <span className="text-error">*</span>
-                    </label>
-                    <div className="relative">
-                      <select
-                        id="university-select"
-                        value={university}
-                        onChange={(e) => setUniversity(e.target.value)}
-                        className="w-full h-11 px-3.5 pr-10 bg-surface-container-low rounded-xl text-xs sm:text-sm text-on-surface appearance-none focus:outline-none focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary border border-outline-variant/30"
-                      >
-                        <option value="">-- Chọn Trường thành viên ĐHQG --</option>
-                        <option value="bk">Trường Đại học Bách Khoa (HCMUT)</option>
-                        <option value="khtn">Trường Đại học Khoa học Tự nhiên (HCMUS)</option>
-                        <option value="khxhnv">Trường Đại học Khoa học Xã hội & Nhân văn (USSH)</option>
-                        <option value="qt">Trường Đại học Quốc Tế (IU)</option>
-                        <option value="cntt">Trường Đại học Công nghệ Thông tin (UIT)</option>
-                        <option value="ktl">Trường Đại học Kinh tế - Luật (UEL)</option>
-                        <option value="yk">Khoa Y - ĐHQG TP.HCM</option>
-                      </select>
-                      <span className="material-symbols-outlined pointer-events-none absolute right-3 top-2.5 text-on-surface-variant text-[20px]">
-                        keyboard_arrow_down
+                <div className="space-y-2">
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary-fixed text-primary text-xs font-semibold">
+                    <span className="material-symbols-outlined text-[15px]">school</span>
+                    <span>Tân Sinh Viên & Sinh Viên ĐHQG</span>
+                  </div>
+                  <h1 className="text-2xl sm:text-3xl font-bold text-on-surface tracking-tight leading-tight">
+                    Hệ Thống Đăng Ký Tài Khoản KTX Thông Minh
+                  </h1>
+                  <p className="text-xs sm:text-sm text-on-surface-variant leading-relaxed">
+                    Nền tảng số hóa quản lý nội trú tập trung dành cho sinh viên Đại học Quốc gia. Tiếp cận nhanh chóng các tiện ích nội trú, quản lý phòng ở và dịch vụ công nghệ số.
+                  </p>
+                </div>
+
+                <div className="relative w-full h-44 rounded-xl overflow-hidden shadow-xs border border-outline-variant/30 group">
+                  <div className="w-full h-full bg-cover bg-center transition-transform duration-500 group-hover:scale-105 bg-slate-800 flex items-center justify-center">
+                    <div className="w-full h-full bg-gradient-to-tr from-primary/80 via-primary/40 to-secondary-container/60 flex items-center justify-center p-4 text-center">
+                      <div className="flex flex-col items-center">
+                        <span className="material-symbols-outlined text-white text-[44px] mb-1">
+                          domain
+                        </span>
+                        <span className="text-white font-bold text-sm tracking-wide">
+                          Ký túc xá Đại học Quốc gia TP.HCM
+                        </span>
+                        <span className="text-white/80 text-xs">Khu Đô thị ĐHQG - Thành phố Thủ Đức</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="absolute inset-0 bg-gradient-to-t from-on-surface/90 via-on-surface/30 to-transparent flex items-end p-4">
+                    <div className="flex items-center justify-between w-full text-white text-xs">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+                        <span className="font-semibold">Khu nội trú KTX • Sẵn sàng đón tân sinh viên</span>
+                      </div>
+                      <span className="font-mono text-primary-fixed font-semibold">K24 Mở cổng</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-2.5 pt-1">
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-surface-container-lowest/80 backdrop-blur-xs shadow-xs border border-outline-variant/20">
+                    <div className="w-9 h-9 rounded-lg bg-primary-fixed flex items-center justify-center text-primary shrink-0">
+                      <span className="material-symbols-outlined text-[20px]">badge</span>
+                    </div>
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-xs font-bold text-on-surface truncate">
+                        Đăng ký nhanh chóng với MSSV
+                      </span>
+                      <span className="text-[11px] text-on-surface-variant truncate">
+                        Tự động khởi tạo hồ sơ và đồng bộ dữ liệu đào tạo
                       </span>
                     </div>
                   </div>
 
-                  {/* MSSV & API Check Button */}
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-bold text-on-surface" htmlFor="student-id">
-                      Mã số sinh viên (MSSV) <span className="text-error">*</span>
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-surface-container-lowest/80 backdrop-blur-xs shadow-xs border border-outline-variant/20">
+                    <div className="w-9 h-9 rounded-lg bg-secondary-fixed flex items-center justify-center text-secondary shrink-0">
+                      <span className="material-symbols-outlined text-[20px]">qr_code_scanner</span>
+                    </div>
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-xs font-bold text-on-surface truncate">
+                        Giám sát điện nước IoT & VietQR
+                      </span>
+                      <span className="text-[11px] text-on-surface-variant truncate">
+                        Theo dõi chỉ số trực tiếp và thanh toán mọi lúc mọi nơi
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-surface-container-lowest/80 backdrop-blur-xs shadow-xs border border-outline-variant/20">
+                    <div className="w-9 h-9 rounded-lg bg-tertiary-fixed flex items-center justify-center text-tertiary shrink-0">
+                      <span className="material-symbols-outlined text-[20px]">lock_reset</span>
+                    </div>
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-xs font-bold text-on-surface truncate">
+                        Bảo mật tài khoản đa lớp
+                      </span>
+                      <span className="text-[11px] text-on-surface-variant truncate">
+                        Mã hóa chuẩn SSL/TLS và tích hợp tài khoản sinh viên
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="relative z-10 pt-4 mt-4 flex flex-wrap items-center justify-between gap-3 text-on-surface-variant text-xs border-t border-outline-variant/20">
+                <div className="flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-[18px] text-primary">security</span>
+                  <span className="font-semibold">ISO/IEC 27001:2022</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-[18px] text-secondary">database</span>
+                  <span>Đồng bộ CSDL ĐHQG</span>
+                </div>
+              </div>
+            </div>
+
+            {/* RIGHT COLUMN: Standard Registration Form */}
+            <div className="lg:col-span-7 flex flex-col justify-center">
+              <div className="bg-surface-container-lowest rounded-2xl p-6 sm:p-8 lg:p-10 shadow-xs border border-outline-variant/30 relative">
+                {/* Form Header */}
+                <div className="flex flex-col gap-2 mb-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-9 h-9 rounded-xl bg-primary text-on-primary flex items-center justify-center shadow-xs">
+                        <span className="material-symbols-outlined text-[20px]">person_add</span>
+                      </div>
+                      <div>
+                        <h2 className="text-xl sm:text-2xl font-bold text-on-surface tracking-tight">
+                          Đăng Ký Tài Khoản Sinh Viên
+                        </h2>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 bg-surface-container-low px-2.5 py-1 rounded-full border border-outline-variant/30">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                      <span className="text-[11px] font-semibold text-on-surface-variant">Cổng đang mở</span>
+                    </div>
+                  </div>
+                  <p className="text-xs text-on-surface-variant">
+                    Nhập thông tin cá nhân và thiết lập mật khẩu để tạo tài khoản KTX SmartDorm
+                  </p>
+                </div>
+
+                {/* Inline Error Message */}
+                {errorMsg && (
+                  <div className="mb-5 p-3 rounded-xl bg-error/10 border border-error/30 flex items-center gap-2.5 text-error text-xs font-semibold animate-in fade-in duration-200">
+                    <span className="material-symbols-outlined text-[18px] shrink-0">error</span>
+                    <span>{errorMsg}</span>
+                  </div>
+                )}
+
+                {/* Inline Success Message */}
+                {submittedSuccess && (
+                  <div className="mb-5 p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center gap-2.5 text-emerald-700 text-xs font-bold animate-in fade-in duration-200">
+                    <span className="material-symbols-outlined text-[20px] text-emerald-600 shrink-0">check_circle</span>
+                    <span>Đăng ký thành công! Đang chuyển hướng vào cổng sinh viên...</span>
+                  </div>
+                )}
+
+                {/* Registration Form */}
+                <form onSubmit={handleRegisterSubmit} className="space-y-4 text-xs">
+                  {/* Họ và tên */}
+                  <div className="space-y-1">
+                    <label className="block text-xs font-semibold text-on-surface" htmlFor="reg-fullname">
+                      Họ và tên sinh viên <span className="text-error">*</span>
                     </label>
-                    <div className="flex gap-2">
-                      <div className="relative flex-1">
+                    <div className="relative flex items-center">
+                      <span className="material-symbols-outlined absolute left-3 text-[18px] text-outline pointer-events-none">
+                        person
+                      </span>
+                      <input
+                        id="reg-fullname"
+                        type="text"
+                        required
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                        placeholder="Ví dụ: Nguyễn Hoàng Nam"
+                        className="w-full h-11 pl-10 pr-3 rounded-lg bg-surface-container-low text-on-surface text-xs placeholder:text-outline outline-none focus:ring-2 focus:ring-primary border border-outline-variant/30 font-medium"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Row: MSSV & Email */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                    <div className="space-y-1">
+                      <label className="block text-xs font-semibold text-on-surface" htmlFor="reg-studentid">
+                        Mã số sinh viên (MSSV) <span className="text-error">*</span>
+                      </label>
+                      <div className="relative flex items-center">
+                        <span className="material-symbols-outlined absolute left-3 text-[18px] text-outline pointer-events-none">
+                          badge
+                        </span>
                         <input
-                          id="student-id"
+                          id="reg-studentid"
                           type="text"
+                          required
                           value={studentId}
                           onChange={(e) => setStudentId(e.target.value)}
                           placeholder="Ví dụ: 24120892"
-                          className="w-full h-11 px-3.5 bg-surface-container-low rounded-xl font-mono text-xs sm:text-sm text-on-surface focus:outline-none focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary border border-outline-variant/30 font-semibold"
+                          className="w-full h-11 pl-10 pr-3 rounded-lg bg-surface-container-low text-on-surface text-xs placeholder:text-outline outline-none focus:ring-2 focus:ring-primary border border-outline-variant/30 font-mono font-semibold"
                         />
                       </div>
-                      <button
-                        type="button"
-                        onClick={handleCheckStudent}
-                        disabled={checkingStudent}
-                        className="px-4 h-11 rounded-xl bg-surface-variant hover:bg-surface-dim text-primary text-xs font-bold flex items-center gap-1.5 transition-colors shrink-0 shadow-xs"
-                      >
-                        {checkingStudent ? (
-                          <>
-                            <span className="material-symbols-outlined text-[18px] animate-spin">
-                              refresh
-                            </span>
-                            <span>Đang đối soát...</span>
-                          </>
-                        ) : (
-                          <>
-                            <span className="material-symbols-outlined text-[18px]">verified</span>
-                            <span>Kiểm tra dữ liệu</span>
-                          </>
-                        )}
-                      </button>
                     </div>
-                    {studentVerified && (
-                      <p className="text-[11px] text-emerald-600 flex items-center gap-1 font-semibold mt-1">
-                        <span className="material-symbols-outlined text-[15px]">check_circle</span>
-                        <span>Dữ liệu hợp lệ: Đã tìm thấy hồ sơ tuyển sinh K24</span>
-                      </p>
-                    )}
-                  </div>
 
-                  {/* CCCD / Hộ chiếu */}
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-bold text-on-surface" htmlFor="id-number">
-                      Số CCCD / Hộ chiếu (12 số) <span className="text-error">*</span>
-                    </label>
-                    <input
-                      id="id-number"
-                      type="text"
-                      value={cccd}
-                      onChange={(e) => setCccd(e.target.value)}
-                      placeholder="Nhập số CCCD gắn chip"
-                      className="w-full h-11 px-3.5 bg-surface-container-low rounded-xl font-mono text-xs sm:text-sm text-on-surface focus:outline-none focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary border border-outline-variant/30"
-                    />
-                    <p className="text-[11px] text-on-surface-variant">Khớp với giấy báo trúng tuyển đại học</p>
-                  </div>
-
-                  {/* Họ và tên (Auto-sync) */}
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-bold text-on-surface" htmlFor="full-name">
-                        Họ và tên sinh viên <span className="text-error">*</span>
+                    <div className="space-y-1">
+                      <label className="block text-xs font-semibold text-on-surface" htmlFor="reg-email">
+                        Email sinh viên / liên hệ <span className="text-error">*</span>
                       </label>
-                      <span className="text-[11px] text-secondary flex items-center gap-1 font-semibold">
-                        <span className="material-symbols-outlined text-[13px]">lock_reset</span> Đồng bộ tự động
-                      </span>
-                    </div>
-                    <input
-                      id="full-name"
-                      type="text"
-                      readOnly
-                      value={fullName}
-                      className="w-full h-11 px-3.5 bg-surface-container font-bold text-sm text-on-surface rounded-xl cursor-not-allowed uppercase border border-outline-variant/30"
-                    />
-                  </div>
-
-                  {/* Ngày sinh & Giới tính */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1.5">
-                      <label className="block text-xs font-bold text-on-surface" htmlFor="birth-date">
-                        Ngày sinh <span className="text-error">*</span>
-                      </label>
-                      <input
-                        id="birth-date"
-                        type="text"
-                        value={birthDate}
-                        onChange={(e) => setBirthDate(e.target.value)}
-                        placeholder="DD/MM/YYYY"
-                        className="w-full h-11 px-3.5 bg-surface-container-low rounded-xl text-xs sm:text-sm text-on-surface focus:outline-none focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary border border-outline-variant/30"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="block text-xs font-bold text-on-surface">
-                        Giới tính <span className="text-error">*</span>
-                      </label>
-                      <div className="flex items-center gap-3 h-11 px-3 bg-surface-container-low rounded-xl border border-outline-variant/30">
-                        <label className="inline-flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-on-surface">
-                          <input
-                            type="radio"
-                            name="gender"
-                            value="male"
-                            checked={gender === 'male'}
-                            onChange={() => setGender('male')}
-                            className="w-4 h-4 text-primary focus:ring-primary"
-                          />
-                          <span>Nam</span>
-                        </label>
-                        <label className="inline-flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-on-surface">
-                          <input
-                            type="radio"
-                            name="gender"
-                            value="female"
-                            checked={gender === 'female'}
-                            onChange={() => setGender('female')}
-                            className="w-4 h-4 text-primary focus:ring-primary"
-                          />
-                          <span>Nữ</span>
-                        </label>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* GROUP 2: Account & Security Credentials */}
-              <div className="space-y-5">
-                <div className="flex items-center gap-3 pb-2 bg-gradient-to-r from-primary/10 via-transparent to-transparent p-3 rounded-xl border-l-4 border-primary">
-                  <span className="w-8 h-8 rounded-lg bg-primary text-on-primary flex items-center justify-center text-sm font-bold shadow-xs">
-                    2
-                  </span>
-                  <div>
-                    <h2 className="text-base sm:text-lg font-bold text-on-surface">
-                      Thông tin liên hệ & Thiết lập tài khoản SmartDorm
-                    </h2>
-                    <p className="text-xs text-on-surface-variant">
-                      Thông tin nhận mã định danh và đăng nhập quản lý phòng
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  {/* Student Email */}
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-bold text-on-surface" htmlFor="student-email">
-                      Email sinh viên ĐHQG <span className="text-error">*</span>
-                    </label>
-                    <div className="relative">
-                      <input
-                        id="student-email"
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="mssv@student.edu.vn"
-                        className="w-full h-11 px-3.5 pl-9 bg-surface-container-low rounded-xl text-xs sm:text-sm text-on-surface focus:outline-none focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary border border-outline-variant/30"
-                      />
-                      <span className="material-symbols-outlined absolute left-2.5 top-3 text-on-surface-variant text-[18px]">
-                        mail
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-on-surface-variant">Hệ thống gửi thư xác thực vào hòm thư này</p>
-                  </div>
-
-                  {/* Phone number & OTP */}
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-bold text-on-surface" htmlFor="student-phone">
-                      Số điện thoại di động nhận OTP <span className="text-error">*</span>
-                    </label>
-                    <div className="flex gap-2">
-                      <div className="relative flex-1">
+                      <div className="relative flex items-center">
+                        <span className="material-symbols-outlined absolute left-3 text-[18px] text-outline pointer-events-none">
+                          mail
+                        </span>
                         <input
-                          id="student-phone"
-                          type="tel"
-                          value={phone}
-                          onChange={(e) => setPhone(e.target.value)}
-                          placeholder="09xx xxx xxx"
-                          className="w-full h-11 px-3.5 pl-9 bg-surface-container-low rounded-xl font-mono text-xs sm:text-sm text-on-surface focus:outline-none focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary border border-outline-variant/30"
+                          id="reg-email"
+                          type="email"
+                          required
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          placeholder="nam.nh24@student.edu.vn"
+                          className="w-full h-11 pl-10 pr-3 rounded-lg bg-surface-container-low text-on-surface text-xs placeholder:text-outline outline-none focus:ring-2 focus:ring-primary border border-outline-variant/30 font-medium"
                         />
-                        <span className="material-symbols-outlined absolute left-2.5 top-3 text-on-surface-variant text-[18px]">
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Row: Phone & University */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                    <div className="space-y-1">
+                      <label className="block text-xs font-semibold text-on-surface" htmlFor="reg-phone">
+                        Số điện thoại di động <span className="text-error">*</span>
+                      </label>
+                      <div className="relative flex items-center">
+                        <span className="material-symbols-outlined absolute left-3 text-[18px] text-outline pointer-events-none">
                           phone_iphone
                         </span>
+                        <input
+                          id="reg-phone"
+                          type="tel"
+                          required
+                          value={phone}
+                          onChange={(e) => setPhone(e.target.value)}
+                          placeholder="0912 345 678"
+                          className="w-full h-11 pl-10 pr-3 rounded-lg bg-surface-container-low text-on-surface text-xs placeholder:text-outline outline-none focus:ring-2 focus:ring-primary border border-outline-variant/30 font-mono"
+                        />
                       </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="block text-xs font-semibold text-on-surface" htmlFor="reg-university">
+                        Trường Đại học / Khoa trực thuộc <span className="text-error">*</span>
+                      </label>
+                      <div className="relative flex items-center">
+                        <select
+                          id="reg-university"
+                          value={university}
+                          onChange={(e) => setUniversity(e.target.value)}
+                          className="w-full h-11 px-3.5 pr-8 rounded-lg bg-surface-container-low text-on-surface text-xs outline-none focus:ring-2 focus:ring-primary border border-outline-variant/30 appearance-none font-medium"
+                        >
+                          <option value="Trường Đại học Bách Khoa (HCMUT)">Trường Đại học Bách Khoa (HCMUT)</option>
+                          <option value="Trường Đại học Khoa học Tự nhiên (HCMUS)">Trường Đại học Khoa học Tự nhiên (HCMUS)</option>
+                          <option value="Trường Đại học Khoa học Xã hội & Nhân văn (USSH)">Trường Đại học Khoa học Xã hội & Nhân văn (USSH)</option>
+                          <option value="Trường Đại học Quốc Tế (IU)">Trường Đại học Quốc Tế (IU)</option>
+                          <option value="Trường Đại học Công nghệ Thông tin (UIT)">Trường Đại học Công nghệ Thông tin (UIT)</option>
+                          <option value="Trường Đại học Kinh tế - Luật (UEL)">Trường Đại học Kinh tế - Luật (UEL)</option>
+                          <option value="Khoa Y - ĐHQG TP.HCM">Khoa Y - ĐHQG TP.HCM</option>
+                          <option value="Khác - ĐHQG TP.HCM">Trường khác / Khối ĐHQG</option>
+                        </select>
+                        <span className="material-symbols-outlined pointer-events-none absolute right-2.5 text-on-surface-variant text-[18px]">
+                          keyboard_arrow_down
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Dorm Area Preference Selection */}
+                  <div className="space-y-1.5 pt-1">
+                    <label className="block text-xs font-semibold text-on-surface">
+                      Khu Ký túc xá đăng ký <span className="text-error">*</span>
+                    </label>
+                    <div className="grid grid-cols-3 gap-2.5">
                       <button
                         type="button"
-                        onClick={handleSendOtp}
-                        disabled={otpRunning && otpCount > 0}
-                        className={`px-3.5 h-11 rounded-xl text-xs font-bold transition-colors shrink-0 shadow-xs ${
-                          otpRunning && otpCount > 0
-                            ? 'bg-primary-fixed text-primary cursor-not-allowed opacity-80'
-                            : 'bg-primary text-white hover:bg-on-primary-fixed-variant'
+                        onClick={() => setDormArea('A')}
+                        className={`p-2.5 rounded-xl border text-left transition-all ${
+                          dormArea === 'A'
+                            ? 'bg-primary-fixed/40 border-primary shadow-xs'
+                            : 'bg-surface-container-low border-outline-variant/30 hover:bg-surface-container'
                         }`}
                       >
-                        {otpRunning && otpCount > 0 ? `Gửi lại (${otpCount}s)` : 'Gửi mã OTP'}
+                        <div className="flex items-center justify-between">
+                          <span className={`text-xs font-bold ${dormArea === 'A' ? 'text-primary' : 'text-on-surface'}`}>
+                            Khu A
+                          </span>
+                          {dormArea === 'A' && (
+                            <span className="material-symbols-outlined text-primary text-[16px]">check_circle</span>
+                          )}
+                        </div>
+                        <span className="text-[10px] text-on-surface-variant block mt-0.5 truncate">
+                          Linh Trung, Thủ Đức
+                        </span>
                       </button>
-                    </div>
-                    <p className="text-[11px] text-on-surface-variant">
-                      Dùng để kích hoạt phòng và thông báo cúp điện/nước
-                    </p>
-                  </div>
 
-                  {/* OTP Input Matrix */}
-                  <div className="space-y-1.5 md:col-span-2">
-                    <label className="block text-xs font-bold text-on-surface">
-                      Nhập mã xác thực OTP 6 chữ số <span className="text-error">*</span>
-                    </label>
-                    <div className="flex items-center gap-2 sm:gap-3 max-w-sm">
-                      {otpDigits.map((digit, idx) => (
-                        <input
-                          key={idx}
-                          id={`otp-input-${idx}`}
-                          type="text"
-                          maxLength={1}
-                          value={digit}
-                          onChange={(e) => handleOtpChange(idx, e.target.value)}
-                          className="w-11 sm:w-12 h-12 text-center text-lg sm:text-xl font-bold bg-surface-container-low rounded-xl text-primary focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary focus:outline-none border border-outline-variant/30 shadow-xs"
-                        />
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Password Field */}
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-bold text-on-surface" htmlFor="new-password">
-                      Mật khẩu đăng nhập mới <span className="text-error">*</span>
-                    </label>
-                    <div className="relative">
-                      <input
-                        id="new-password"
-                        type={showPassword ? 'text' : 'password'}
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        className="w-full h-11 px-3.5 pl-9 pr-10 bg-surface-container-low rounded-xl text-xs sm:text-sm text-on-surface focus:outline-none focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary border border-outline-variant/30"
-                      />
-                      <span className="material-symbols-outlined absolute left-2.5 top-3 text-on-surface-variant text-[18px]">
-                        key
-                      </span>
                       <button
                         type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="material-symbols-outlined absolute right-3 top-3 text-on-surface-variant text-[18px] hover:text-on-surface"
-                      >
-                        {showPassword ? 'visibility_off' : 'visibility'}
-                      </button>
-                    </div>
-
-                    {/* Password Strength Bar */}
-                    <div className="space-y-1 pt-1">
-                      <div className="flex items-center justify-between text-[11px]">
-                        <span className="text-on-surface-variant">Độ bảo mật:</span>
-                        <span className="text-secondary font-bold">Rất mạnh (Khuyên dùng)</span>
-                      </div>
-                      <div className="w-full bg-surface-container h-1.5 rounded-full overflow-hidden flex gap-1">
-                        <div className="h-full w-1/4 bg-emerald-500 rounded-full" />
-                        <div className="h-full w-1/4 bg-emerald-500 rounded-full" />
-                        <div className="h-full w-1/4 bg-emerald-500 rounded-full" />
-                        <div className="h-full w-1/4 bg-emerald-500 rounded-full" />
-                      </div>
-                      <p className="text-[10px] text-on-surface-variant">
-                        Tối thiểu 8 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt.
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Confirm Password Field */}
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-bold text-on-surface" htmlFor="confirm-password">
-                      Xác nhận mật khẩu mới <span className="text-error">*</span>
-                    </label>
-                    <div className="relative">
-                      <input
-                        id="confirm-password"
-                        type={showConfirmPassword ? 'text' : 'password'}
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        className="w-full h-11 px-3.5 pl-9 pr-10 bg-surface-container-low rounded-xl text-xs sm:text-sm text-on-surface focus:outline-none focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary border border-outline-variant/30"
-                      />
-                      <span className="material-symbols-outlined absolute left-2.5 top-3 text-on-surface-variant text-[18px]">
-                        lock
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                        className="material-symbols-outlined absolute right-3 top-3 text-on-surface-variant text-[18px] hover:text-on-surface"
-                      >
-                        {showConfirmPassword ? 'visibility_off' : 'visibility'}
-                      </button>
-                    </div>
-                    {password && confirmPassword && (
-                      <p
-                        className={`text-[11px] flex items-center gap-1 font-semibold ${
-                          password === confirmPassword ? 'text-emerald-600' : 'text-error'
+                        onClick={() => setDormArea('B')}
+                        className={`p-2.5 rounded-xl border text-left transition-all ${
+                          dormArea === 'B'
+                            ? 'bg-primary-fixed/40 border-primary shadow-xs'
+                            : 'bg-surface-container-low border-outline-variant/30 hover:bg-surface-container'
                         }`}
                       >
-                        <span className="material-symbols-outlined text-[14px]">
-                          {password === confirmPassword ? 'check' : 'close'}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1">
+                            <span className={`text-xs font-bold ${dormArea === 'B' ? 'text-primary' : 'text-on-surface'}`}>
+                              Khu B
+                            </span>
+                            <span className="px-1 py-0.2 rounded bg-primary text-white text-[9px] font-bold">
+                              Phổ biến
+                            </span>
+                          </div>
+                          {dormArea === 'B' && (
+                            <span className="material-symbols-outlined text-primary text-[16px]">check_circle</span>
+                          )}
+                        </div>
+                        <span className="text-[10px] text-on-surface-variant block mt-0.5 truncate">
+                          Tân Lập, Dĩ An
                         </span>
-                        <span>{password === confirmPassword ? 'Khớp mật khẩu' : 'Mật khẩu chưa khớp'}</span>
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
+                      </button>
 
-              {/* GROUP 3: Initial Dormitory Preferences */}
-              <div className="space-y-5">
-                <div className="flex items-center gap-3 pb-2 bg-gradient-to-r from-primary/10 via-transparent to-transparent p-3 rounded-xl border-l-4 border-primary">
-                  <span className="w-8 h-8 rounded-lg bg-primary text-on-primary flex items-center justify-center text-sm font-bold shadow-xs">
-                    3
-                  </span>
-                  <div>
-                    <h2 className="text-base sm:text-lg font-bold text-on-surface">
-                      Nguyện vọng lưu trú ban đầu
-                    </h2>
-                    <p className="text-xs text-on-surface-variant">
-                      Thông tin để Hội đồng Quản lý Ký túc xá phân bổ tòa nhà và loại giường phù hợp
-                    </p>
-                  </div>
-                </div>
-
-                {/* Campus Selection (Cards) */}
-                <div className="space-y-2">
-                  <label className="block text-xs font-bold text-on-surface">
-                    Chọn Phân khu Ký túc xá mong muốn <span className="text-error">*</span>
-                  </label>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    {/* Khu A */}
-                    <div
-                      onClick={() => setDormArea('A')}
-                      className={`relative flex flex-col p-4 rounded-xl cursor-pointer transition-all border ${
-                        dormArea === 'A'
-                          ? 'bg-primary-fixed/30 border-primary shadow-xs'
-                          : 'bg-surface-container-low hover:bg-surface-container border-outline-variant/30'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className={`text-sm font-bold ${dormArea === 'A' ? 'text-primary' : 'text-on-surface'}`}>
-                          Khu A - Linh Trung
-                        </span>
-                        <div
-                          className={`w-5 h-5 rounded-full flex items-center justify-center ${
-                            dormArea === 'A' ? 'bg-primary text-white' : 'bg-surface border border-outline-variant'
-                          }`}
-                        >
-                          {dormArea === 'A' && <span className="material-symbols-outlined text-[14px]">check</span>}
-                        </div>
-                      </div>
-                      <p className="text-xs text-on-surface-variant mt-2 leading-relaxed">
-                        Khuôn viên trung tâm, gần ĐH Bách Khoa, KHTN, thư viện trung tâm ĐHQG.
-                      </p>
-                      <span className="mt-3 text-[11px] text-secondary font-bold">
-                        Cơ bản tiêu chuẩn • Nhiều cây xanh
-                      </span>
-                    </div>
-
-                    {/* Khu B (Active selection) */}
-                    <div
-                      onClick={() => setDormArea('B')}
-                      className={`relative flex flex-col p-4 rounded-xl cursor-pointer transition-all border ${
-                        dormArea === 'B'
-                          ? 'bg-primary-fixed/30 border-primary shadow-xs'
-                          : 'bg-surface-container-low hover:bg-surface-container border-outline-variant/30'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1.5">
-                          <span className={`text-sm font-bold ${dormArea === 'B' ? 'text-primary' : 'text-on-surface'}`}>
-                            Khu B - Tân Lập
-                          </span>
-                          <span className="px-2 py-0.5 rounded-full bg-primary text-white text-[10px] font-bold">
-                            Phổ biến
-                          </span>
-                        </div>
-                        <div
-                          className={`w-5 h-5 rounded-full flex items-center justify-center ${
-                            dormArea === 'B' ? 'bg-primary text-white' : 'bg-surface border border-outline-variant'
-                          }`}
-                        >
-                          {dormArea === 'B' && <span className="material-symbols-outlined text-[14px]">check</span>}
-                        </div>
-                      </div>
-                      <p className="text-xs text-on-surface-variant mt-2 leading-relaxed">
-                        Tòa nhà hiện đại, gần ĐH Công nghệ Thông tin, Kinh tế Luật và trạm Metro.
-                      </p>
-                      <span className="mt-3 text-[11px] text-primary font-bold">
-                        Tích hợp điều hòa • Thang máy tốc độ cao
-                      </span>
-                    </div>
-
-                    {/* Khu C */}
-                    <div
-                      onClick={() => setDormArea('C')}
-                      className={`relative flex flex-col p-4 rounded-xl cursor-pointer transition-all border ${
-                        dormArea === 'C'
-                          ? 'bg-primary-fixed/30 border-primary shadow-xs'
-                          : 'bg-surface-container-low hover:bg-surface-container border-outline-variant/30'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className={`text-sm font-bold ${dormArea === 'C' ? 'text-primary' : 'text-on-surface'}`}>
-                          Khu C - Sau đại học
-                        </span>
-                        <div
-                          className={`w-5 h-5 rounded-full flex items-center justify-center ${
-                            dormArea === 'C' ? 'bg-primary text-white' : 'bg-surface border border-outline-variant'
-                          }`}
-                        >
-                          {dormArea === 'C' && <span className="material-symbols-outlined text-[14px]">check</span>}
-                        </div>
-                      </div>
-                      <p className="text-xs text-on-surface-variant mt-2 leading-relaxed">
-                        Dành cho học viên cao học, nghiên cứu sinh và lưu học sinh quốc tế.
-                      </p>
-                      <span className="mt-3 text-[11px] text-outline font-bold">
-                        Không gian yên tĩnh độc lập
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Room Types & Priority Groups */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-1">
-                  {/* Loại phòng */}
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-bold text-on-surface" htmlFor="room-type">
-                      Loại phòng đăng ký ưu tiên <span className="text-error">*</span>
-                    </label>
-                    <div className="relative">
-                      <select
-                        id="room-type"
-                        value={roomType}
-                        onChange={(e) => setRoomType(e.target.value)}
-                        className="w-full h-11 px-3.5 pr-10 bg-surface-container-low rounded-xl text-xs sm:text-sm text-on-surface appearance-none focus:outline-none focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary border border-outline-variant/30"
+                      <button
+                        type="button"
+                        onClick={() => setDormArea('C')}
+                        className={`p-2.5 rounded-xl border text-left transition-all ${
+                          dormArea === 'C'
+                            ? 'bg-primary-fixed/40 border-primary shadow-xs'
+                            : 'bg-surface-container-low border-outline-variant/30 hover:bg-surface-container'
+                        }`}
                       >
-                        <option value="4-ac">Phòng 4 sinh viên (Có máy lạnh, WC khép kín - 650.000đ/tháng)</option>
-                        <option value="6-ac">Phòng 6 sinh viên (Có máy lạnh, WC khép kín - 480.000đ/tháng)</option>
-                        <option value="8-fan">Phòng 8 sinh viên (Quạt trần tiêu chuẩn - 280.000đ/tháng)</option>
-                        <option value="2-service">Phòng 2 sinh viên (Dịch vụ cao cấp khép kín - 1.250.000đ/tháng)</option>
-                      </select>
-                      <span className="material-symbols-outlined pointer-events-none absolute right-3 top-3 text-on-surface-variant text-[20px]">
-                        keyboard_arrow_down
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-on-surface-variant">
-                      Chi phí chưa bao gồm tiền định mức điện nước thực tế phát sinh.
-                    </p>
-                  </div>
-
-                  {/* Priority Policy Category */}
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-bold text-on-surface">
-                      Đối tượng chính sách được ưu tiên xét duyệt
-                    </label>
-                    <div className="grid grid-cols-2 gap-2 bg-surface-container-low p-3 rounded-xl border border-outline-variant/30">
-                      <label className="flex items-center gap-2 cursor-pointer text-xs text-on-surface font-medium">
-                        <input
-                          type="checkbox"
-                          checked={priorityPolicies.poor}
-                          onChange={(e) =>
-                            setPriorityPolicies({ ...priorityPolicies, poor: e.target.checked, none: false })
-                          }
-                          className="w-4 h-4 rounded text-primary focus:ring-primary"
-                        />
-                        <span>Hộ nghèo / cận nghèo</span>
-                      </label>
-                      <label className="flex items-center gap-2 cursor-pointer text-xs text-on-surface font-medium">
-                        <input
-                          type="checkbox"
-                          checked={priorityPolicies.remote}
-                          onChange={(e) =>
-                            setPriorityPolicies({ ...priorityPolicies, remote: e.target.checked, none: false })
-                          }
-                          className="w-4 h-4 rounded text-primary focus:ring-primary"
-                        />
-                        <span>Vùng sâu, vùng xa</span>
-                      </label>
-                      <label className="flex items-center gap-2 cursor-pointer text-xs text-on-surface font-medium">
-                        <input
-                          type="checkbox"
-                          checked={priorityPolicies.martyr}
-                          onChange={(e) =>
-                            setPriorityPolicies({ ...priorityPolicies, martyr: e.target.checked, none: false })
-                          }
-                          className="w-4 h-4 rounded text-primary focus:ring-primary"
-                        />
-                        <span>Con thương binh, liệt sĩ</span>
-                      </label>
-                      <label className="flex items-center gap-2 cursor-pointer text-xs text-on-surface font-medium">
-                        <input
-                          type="checkbox"
-                          checked={priorityPolicies.none}
-                          onChange={(e) =>
-                            setPriorityPolicies({
-                              poor: false,
-                              remote: false,
-                              martyr: false,
-                              none: e.target.checked,
-                            })
-                          }
-                          className="w-4 h-4 rounded text-primary focus:ring-primary"
-                        />
-                        <span>Không diện ưu tiên</span>
-                      </label>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Campus Life Visual Insight Card */}
-              <div className="w-full bg-surface-container-low rounded-2xl p-4 sm:p-6 flex flex-col md:flex-row items-center gap-5 border border-outline-variant/30">
-                <div
-                  className="w-full md:w-48 h-32 rounded-xl bg-cover bg-center shrink-0 shadow-xs bg-slate-800"
-                  style={{
-                    backgroundImage:
-                      "url('https://lh3.googleusercontent.com/aida-public/AB6AXuBVk_3gHG0Ih1HJaTd1fmgrTLtMr4NmWeXI-M4cgO2dx06inRkej2nBWH7BUr4vpiYf4rpn0Sa16qpokP-iQpPuCaG7iLOGVf4-LqCyu_r47Fo-Q7FrgMFUxAjS3GdACzxS63W3voMeVIUi046JVh3EV52MNRIERLQNnVLlX5HkLr9WX5vCVHuXtx9lfjZKR6w5rxQO078Sism_Pum18iwhJJSPN5L6XXauIhQZxCwgAtZ5AgSP-CynFg')",
-                  }}
-                />
-                <div className="space-y-1.5 flex-1">
-                  <div className="inline-flex items-center gap-1.5 text-primary text-xs font-bold">
-                    <span className="material-symbols-outlined text-[16px]">apartment</span>
-                    <span>Không gian sống tiện ích tại KTX Đại học Quốc gia</span>
-                  </div>
-                  <p className="text-sm sm:text-base font-bold text-on-surface">
-                    Hệ sinh thái thông minh 24/7 phục vụ việc học tập & rèn luyện
-                  </p>
-                  <p className="text-xs text-on-surface-variant leading-relaxed">
-                    Mỗi phòng được trang bị thẻ từ bảo mật, hệ thống cảm biến báo khói, wifi mesh tốc độ cao toàn khu và khu vực giặt sấy tự động tích hợp ví thanh toán sinh viên.
-                  </p>
-                </div>
-              </div>
-
-              {/* Commitment & Terms of Service */}
-              <div className="space-y-3 p-4 rounded-xl bg-surface-container-high/60 border border-outline-variant/30">
-                <div className="flex items-start gap-3">
-                  <input
-                    id="terms-agree"
-                    type="checkbox"
-                    checked={agreeTerms}
-                    onChange={(e) => setAgreeTerms(e.target.checked)}
-                    className="mt-1 w-4 h-4 rounded text-primary focus:ring-primary shrink-0"
-                  />
-                  <label
-                    htmlFor="terms-agree"
-                    className="text-xs sm:text-sm text-on-surface cursor-pointer select-none leading-relaxed"
-                  >
-                    Tôi cam kết các thông tin khai báo trên là hoàn toàn chính xác và đồng ý tuân thủ toàn bộ{' '}
-                    <a className="text-primary font-bold underline underline-offset-2 hover:opacity-80" href="#rules">
-                      Nội quy Sinh viên Ký túc xá Đại học Quốc gia
-                    </a>.
-                  </label>
-                </div>
-                <div className="flex items-start gap-3">
-                  <input
-                    id="notify-agree"
-                    type="checkbox"
-                    checked={agreeNotify}
-                    onChange={(e) => setAgreeNotify(e.target.checked)}
-                    className="mt-1 w-4 h-4 rounded text-primary focus:ring-primary shrink-0"
-                  />
-                  <label
-                    htmlFor="notify-agree"
-                    className="text-xs sm:text-sm text-on-surface cursor-pointer select-none leading-relaxed"
-                  >
-                    Đồng ý nhận thông báo điện tử về hóa đơn điện nước, kết quả xếp phòng tự động và lịch nhận bàn giao giường qua ứng dụng KTX SmartDorm, Zalo và Email sinh viên.
-                  </label>
-                </div>
-              </div>
-
-              {/* Form Actions & Submission */}
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
-                <Link
-                  to="/login"
-                  className="text-xs sm:text-sm font-semibold text-on-surface-variant hover:text-primary transition-colors flex items-center gap-1.5"
-                >
-                  <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-                  <span>
-                    Đã có tài khoản KTX? <strong className="text-primary underline">Đăng nhập ngay</strong>
-                  </span>
-                </Link>
-
-                <div className="flex items-center gap-3 w-full sm:w-auto">
-                  <button
-                    type="button"
-                    onClick={handleSaveDraft}
-                    className="hidden sm:inline-flex px-5 h-12 rounded-xl bg-surface-container hover:bg-surface-variant text-on-surface text-xs font-bold transition-colors border border-outline-variant/30"
-                  >
-                    Lưu bản nháp
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={submitting}
-                    className="w-full sm:w-auto px-6 h-12 rounded-xl bg-primary hover:bg-on-primary-fixed-variant active:bg-on-primary-fixed text-on-primary text-xs sm:text-sm font-bold shadow-md transition-all flex items-center justify-center gap-2 group"
-                  >
-                    {submitting ? (
-                      <>
-                        <span className="material-symbols-outlined text-[20px] animate-spin">sync</span>
-                        <span>Đang xử lý hồ sơ...</span>
-                      </>
-                    ) : submittedSuccess ? (
-                      <>
-                        <span className="material-symbols-outlined text-[20px]">check</span>
-                        <span>Đã hoàn tất kích hoạt</span>
-                      </>
-                    ) : (
-                      <>
-                        <span>Tiếp tục: Hoàn tất Kích hoạt & Nộp hồ sơ</span>
-                        <span className="material-symbols-outlined text-[20px] group-hover:translate-x-1 transition-transform">
-                          arrow_forward
+                        <div className="flex items-center justify-between">
+                          <span className={`text-xs font-bold ${dormArea === 'C' ? 'text-primary' : 'text-on-surface'}`}>
+                            Khu C
+                          </span>
+                          {dormArea === 'C' && (
+                            <span className="material-symbols-outlined text-primary text-[16px]">check_circle</span>
+                          )}
+                        </div>
+                        <span className="text-[10px] text-on-surface-variant block mt-0.5 truncate">
+                          Sau đại học
                         </span>
-                      </>
-                    )}
-                  </button>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Row: Password & Confirm Password */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 pt-1">
+                    <div className="space-y-1">
+                      <label className="block text-xs font-semibold text-on-surface" htmlFor="reg-password">
+                        Mật khẩu đăng nhập <span className="text-error">*</span>
+                      </label>
+                      <div className="relative flex items-center">
+                        <span className="material-symbols-outlined absolute left-3 text-[18px] text-outline pointer-events-none">
+                          lock
+                        </span>
+                        <input
+                          id="reg-password"
+                          type={showPassword ? 'text' : 'password'}
+                          required
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          placeholder="Tối thiểu 6 ký tự"
+                          className="w-full h-11 pl-10 pr-10 rounded-lg bg-surface-container-low text-on-surface text-xs outline-none focus:ring-2 focus:ring-primary border border-outline-variant/30"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-3 text-outline hover:text-on-surface"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">
+                            {showPassword ? 'visibility_off' : 'visibility'}
+                          </span>
+                        </button>
+                      </div>
+
+                      {/* Password strength meter */}
+                      {password && (
+                        <div className="flex items-center gap-1.5 pt-1">
+                          <div className="flex-1 h-1 bg-surface-container rounded-full overflow-hidden flex gap-0.5">
+                            <div className={`h-full ${strength.level >= 1 ? strength.color : 'bg-transparent'} flex-1`} />
+                            <div className={`h-full ${strength.level >= 2 ? strength.color : 'bg-transparent'} flex-1`} />
+                            <div className={`h-full ${strength.level >= 3 ? strength.color : 'bg-transparent'} flex-1`} />
+                            <div className={`h-full ${strength.level >= 4 ? strength.color : 'bg-transparent'} flex-1`} />
+                          </div>
+                          <span className="text-[10px] text-on-surface-variant font-medium">
+                            {strength.text}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="block text-xs font-semibold text-on-surface" htmlFor="reg-confirm-password">
+                        Xác nhận lại mật khẩu <span className="text-error">*</span>
+                      </label>
+                      <div className="relative flex items-center">
+                        <span className="material-symbols-outlined absolute left-3 text-[18px] text-outline pointer-events-none">
+                          verified_user
+                        </span>
+                        <input
+                          id="reg-confirm-password"
+                          type={showConfirmPassword ? 'text' : 'password'}
+                          required
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          placeholder="Nhập lại mật khẩu"
+                          className="w-full h-11 pl-10 pr-10 rounded-lg bg-surface-container-low text-on-surface text-xs outline-none focus:ring-2 focus:ring-primary border border-outline-variant/30"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          className="absolute right-3 text-outline hover:text-on-surface"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">
+                            {showConfirmPassword ? 'visibility_off' : 'visibility'}
+                          </span>
+                        </button>
+                      </div>
+
+                      {/* Matching password notice */}
+                      {confirmPassword && (
+                        <div className="pt-1">
+                          {password === confirmPassword ? (
+                            <span className="text-[10px] text-emerald-600 flex items-center gap-1 font-semibold">
+                              <span className="material-symbols-outlined text-[13px]">check_circle</span>
+                              <span>Mật khẩu trùng khớp</span>
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-error flex items-center gap-1 font-semibold">
+                              <span className="material-symbols-outlined text-[13px]">cancel</span>
+                              <span>Mật khẩu chưa khớp</span>
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Terms & Conditions Checkbox */}
+                  <div className="pt-2">
+                    <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={agreeTerms}
+                        onChange={(e) => setAgreeTerms(e.target.checked)}
+                        className="mt-0.5 w-4 h-4 rounded text-primary accent-primary cursor-pointer shrink-0"
+                      />
+                      <span className="text-[11px] text-on-surface-variant leading-relaxed">
+                        Tôi cam kết thông tin khai báo là hoàn toàn chính xác và đồng ý tuân thủ{' '}
+                        <a href="#rules" className="text-primary font-semibold hover:underline">
+                          Nội quy Ký túc xá ĐHQG
+                        </a>{' '}
+                        cùng chính sách bảo mật hệ thống SmartDorm.
+                      </span>
+                    </label>
+                  </div>
+
+                  {/* Submit Button & Switch to Login */}
+                  <div className="pt-3 flex flex-col gap-2.5">
+                    <button
+                      type="submit"
+                      disabled={submitting || submittedSuccess}
+                      className="w-full h-11 rounded-xl bg-primary hover:bg-primary-container text-on-primary text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition-all disabled:opacity-60"
+                    >
+                      {submitting ? (
+                        <>
+                          <span className="material-symbols-outlined text-[20px] animate-spin">sync</span>
+                          <span>Đang khởi tạo tài khoản...</span>
+                        </>
+                      ) : submittedSuccess ? (
+                        <>
+                          <span className="material-symbols-outlined text-[20px]">check</span>
+                          <span>Đã đăng ký thành công!</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="material-symbols-outlined text-[20px]">how_to_reg</span>
+                          <span>Đăng ký tài khoản ngay</span>
+                        </>
+                      )}
+                    </button>
+
+                    <div className="text-center pt-1">
+                      <Link
+                        to="/login"
+                        className="text-xs text-on-surface-variant hover:text-primary transition-colors font-medium"
+                      >
+                        Đã có tài khoản KTX? <strong className="text-primary underline">Đăng nhập ngay</strong>
+                      </Link>
+                    </div>
+                  </div>
+                </form>
+
+                {/* Footer Security Note */}
+                <div className="mt-6 pt-4 border-t border-outline-variant/30 flex flex-col sm:flex-row items-center justify-between gap-2 text-on-surface-variant text-[11px]">
+                  <div className="flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-[16px] text-emerald-600">lock</span>
+                    <span>Bảo mật TLS 1.3 & CSDL ĐHQG</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span>Hỗ trợ tuyển sinh:</span>
+                    <a className="font-mono font-semibold text-primary hover:underline" href="tel:02437547890">
+                      024 3754 7890
+                    </a>
+                  </div>
                 </div>
               </div>
-            </form>
-          </div>
-
-          {/* Help & Support Badge Row */}
-          <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 text-on-surface-variant text-xs pb-4">
-            <div className="flex items-center gap-1.5">
-              <span className="material-symbols-outlined text-secondary text-[18px]">security</span>
-              <span>Dữ liệu mã hóa kết nối SSL/TLS 256-bit</span>
-            </div>
-            <span className="text-outline-variant hidden sm:inline">•</span>
-            <div className="flex items-center gap-1.5">
-              <span className="material-symbols-outlined text-primary text-[18px]">help_center</span>
-              <span>
-                Hỗ trợ kỹ thuật: <strong>hotro@ktx.vnuhcm.edu.vn</strong>
-              </span>
-            </div>
-            <span className="text-outline-variant hidden sm:inline">•</span>
-            <div className="flex items-center gap-1.5">
-              <span className="material-symbols-outlined text-secondary text-[18px]">schedule</span>
-              <span>Thời gian mở cổng đăng ký: 01/08 - 25/08/2024</span>
             </div>
           </div>
         </div>
@@ -1066,7 +769,7 @@ export const RegisterPage: React.FC = () => {
             </a>
             <span>•</span>
             <a className="hover:text-primary transition-colors" href="#vnu-id">
-              Hướng dẫn kích hoạt VNU-ID
+              Hướng dẫn sinh viên
             </a>
           </div>
         </div>

@@ -1,6 +1,7 @@
 import React from 'react';
 import { StudentInfo, StudentBill, StudentTicket } from '../../core/types';
 import { eventBus, EVENTS } from '../../core/bus';
+import { useStore } from '../../store/useStore';
 
 interface StudentOverviewAppProps {
   info: StudentInfo;
@@ -23,6 +24,8 @@ export const StudentOverviewApp: React.FC<StudentOverviewAppProps> = ({
   onOpenMeter,
   onOpenLeave
 }) => {
+  const { approveStudentRoom } = useStore();
+  const isPending = info.status === 'pending' || !info.roomNumber;
   const pendingBill = bills.find(b => b.status === 'pending') || bills[0];
 
   return (
@@ -31,9 +34,11 @@ export const StudentOverviewApp: React.FC<StudentOverviewAppProps> = ({
       <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 pb-2">
         <div className="flex flex-col gap-1.5">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-surface-container-high w-fit">
-            <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-            <span className="text-[11px] text-primary font-semibold tracking-wide uppercase">
-              Cổng nội trú KTX Đại học Quốc gia • Phòng 402 - Tòa B2 (Khu B)
+            <span className={`w-2 h-2 rounded-full ${isPending ? 'bg-amber-500 animate-ping' : 'bg-primary animate-pulse'}`} />
+            <span className={`text-[11px] font-semibold tracking-wide uppercase ${isPending ? 'text-amber-700 dark:text-amber-300' : 'text-primary'}`}>
+              {isPending
+                ? `Hồ sơ đăng ký KTX • Trạng thái: Chờ xét duyệt & Xếp phòng (${info.zone})`
+                : `Cổng nội trú KTX Đại học Quốc gia • Phòng ${info.roomNumber} - Tòa ${info.building} (${info.zone})`}
             </span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold text-on-surface tracking-tight">
@@ -54,24 +59,69 @@ export const StudentOverviewApp: React.FC<StudentOverviewAppProps> = ({
 
         {/* Quick Action CTA Group */}
         <div className="flex items-center gap-3 self-start xl:self-auto shrink-0 flex-wrap">
-          <button
-            onClick={onOpenReportFault}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-surface-container text-on-surface hover:bg-surface-container-high text-xs sm:text-sm font-semibold transition-all shadow-xs border border-outline-variant/30 active:scale-95"
-            type="button"
-          >
-            <span className="material-symbols-outlined text-[20px] text-primary">build</span>
-            <span>Gửi báo hỏng thiết bị</span>
-          </button>
-          <button
-            onClick={onOpenPayBill}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-primary text-on-primary hover:bg-primary-container text-xs sm:text-sm font-semibold shadow-sm hover:shadow-md transition-all active:scale-95"
-            type="button"
-          >
-            <span className="material-symbols-outlined text-[20px]">payments</span>
-            <span>Thanh toán hóa đơn tháng 10</span>
-          </button>
+          {isPending ? (
+            <button
+              onClick={approveStudentRoom}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-semibold shadow-sm hover:shadow-md transition-all active:scale-95"
+              type="button"
+            >
+              <span className="material-symbols-outlined text-[20px]">domain_verification</span>
+              <span>⚡ Mô phỏng: Ban Quản lý duyệt & xếp phòng</span>
+            </button>
+          ) : (
+            <>
+              <button
+                onClick={onOpenReportFault}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-surface-container text-on-surface hover:bg-surface-container-high text-xs sm:text-sm font-semibold transition-all shadow-xs border border-outline-variant/30 active:scale-95"
+                type="button"
+              >
+                <span className="material-symbols-outlined text-[20px] text-primary">build</span>
+                <span>Gửi báo hỏng thiết bị</span>
+              </button>
+              <button
+                onClick={onOpenPayBill}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-primary text-on-primary hover:bg-primary-container text-xs sm:text-sm font-semibold shadow-sm hover:shadow-md transition-all active:scale-95"
+                type="button"
+              >
+                <span className="material-symbols-outlined text-[20px]">payments</span>
+                <span>Thanh toán hóa đơn</span>
+              </button>
+            </>
+          )}
         </div>
       </div>
+
+      {/* Pending Notice Banner */}
+      {isPending && (
+        <div className="p-4 sm:p-5 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="flex items-start gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-600 flex items-center justify-center shrink-0 mt-0.5">
+              <span className="material-symbols-outlined text-[24px]">hourglass_top</span>
+            </div>
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-sm font-bold text-amber-900 dark:text-amber-300">
+                  Hồ sơ tân sinh viên đang chờ Ban Quản lý KTX xét duyệt & phân bổ phòng
+                </h3>
+                <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-800 dark:text-amber-200 text-[10px] font-bold uppercase tracking-wide">
+                  Đang thẩm định
+                </span>
+              </div>
+              <p className="text-xs text-on-surface-variant leading-relaxed">
+                Tài khoản của bạn đã được ghi nhận trên hệ thống SmartDorm với nguyện vọng: <strong>{info.zone}</strong> (Loại phòng: {info.preferredRoomType === '4-ac' ? 'Phòng 4 SV máy lạnh' : 'Tiêu chuẩn KTX'}). Hiện tại chưa có phòng ở, chưa có danh sách bạn cùng phòng và chưa phát sinh chi phí điện nước.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={approveStudentRoom}
+            type="button"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition-all shadow-sm shrink-0 whitespace-nowrap active:scale-95"
+          >
+            <span className="material-symbols-outlined text-[18px]">verified</span>
+            <span>⚡ Phê duyệt & xếp phòng ngay</span>
+          </button>
+        </div>
+      )}
 
       {/* 4 KPI Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -80,10 +130,10 @@ export const StudentOverviewApp: React.FC<StudentOverviewAppProps> = ({
           <div className="flex items-start justify-between">
             <div className="flex flex-col gap-1">
               <span className="text-xs text-on-surface-variant uppercase tracking-wider font-semibold">
-                Phòng đang ở
+                {isPending ? 'Trạng thái xếp phòng' : 'Phòng đang ở'}
               </span>
               <span className="text-xl sm:text-2xl text-on-surface font-bold">
-                P.{info.roomNumber} - Nhà {info.building}
+                {isPending ? 'Chưa xếp phòng' : `P.${info.roomNumber} - Nhà ${info.building}`}
               </span>
             </div>
             <div className="w-10 h-10 rounded-xl bg-surface-container flex items-center justify-center text-primary">
@@ -92,16 +142,20 @@ export const StudentOverviewApp: React.FC<StudentOverviewAppProps> = ({
           </div>
           <div className="mt-4 pt-3 flex flex-col gap-2 border-t border-surface-container-high/60">
             <div className="flex items-center justify-between text-on-surface-variant text-xs">
-              <span>Sĩ số phòng: <strong>3/4 bạn</strong></span>
-              <span className="px-2 py-0.5 rounded-full bg-secondary-fixed text-on-secondary-fixed text-[11px] font-semibold">
-                Đang lưu trú
+              <span>{isPending ? info.zone : `Sĩ số phòng: ${info.roommates.length}/4 bạn`}</span>
+              <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${
+                isPending ? 'bg-amber-500/20 text-amber-700 dark:text-amber-300' : 'bg-secondary-fixed text-on-secondary-fixed'
+              }`}>
+                {isPending ? 'Chờ BQL xếp' : 'Đang lưu trú'}
               </span>
             </div>
             <div className="w-full bg-surface-container h-1.5 rounded-full overflow-hidden">
-              <div className="bg-primary h-full rounded-full" style={{ width: '75%' }} />
+              <div className="bg-primary h-full rounded-full transition-all" style={{ width: isPending ? '15%' : '75%' }} />
             </div>
-            <span className="text-[11px] text-on-surface-variant">
-              Phòng 4 giường tiêu chuẩn • Đầy đủ điều hòa
+            <span className="text-[11px] text-on-surface-variant truncate">
+              {isPending
+                ? `Loại phòng: ${info.preferredRoomType === '4-ac' ? 'Phòng 4 SV máy lạnh' : 'Tiêu chuẩn KTX'}`
+                : 'Phòng 4 giường tiêu chuẩn • Đầy đủ điều hòa'}
             </span>
           </div>
         </div>
@@ -114,7 +168,7 @@ export const StudentOverviewApp: React.FC<StudentOverviewAppProps> = ({
                 Hạn hợp đồng lưu trú
               </span>
               <span className="text-xl sm:text-2xl text-primary font-bold">
-                Còn {info.contract.daysLeft} ngày
+                {isPending ? 'Chờ ký duyệt' : `Còn ${info.contract.daysLeft} ngày`}
               </span>
             </div>
             <div className="w-10 h-10 rounded-xl bg-primary-fixed flex items-center justify-center text-primary">
@@ -123,12 +177,16 @@ export const StudentOverviewApp: React.FC<StudentOverviewAppProps> = ({
           </div>
           <div className="mt-4 pt-3 flex flex-col gap-1 border-t border-surface-container-high/60">
             <div className="flex items-center justify-between text-xs">
-              <span className="text-on-surface-variant">Hết hạn: <strong>{info.contract.expiryDate}</strong></span>
-              <span className="font-mono text-xs text-outline font-semibold">{info.contract.id}</span>
+              <span className="text-on-surface-variant truncate">
+                {isPending ? 'Hồ sơ: Đang thẩm định' : `Hết hạn: ${info.contract.expiryDate}`}
+              </span>
+              <span className="font-mono text-xs text-outline font-semibold shrink-0">{info.contract.id}</span>
             </div>
             <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-surface-container-high text-on-surface-variant text-[11px] mt-1">
               <span className="material-symbols-outlined text-[14px] text-primary">info</span>
-              <span className="truncate">Gia hạn từ: {info.contract.renewalStartDate}</span>
+              <span className="truncate">
+                {isPending ? 'Hợp đồng kích hoạt khi có phòng' : `Gia hạn từ: ${info.contract.renewalStartDate}`}
+              </span>
             </div>
           </div>
         </div>
@@ -138,27 +196,39 @@ export const StudentOverviewApp: React.FC<StudentOverviewAppProps> = ({
           <div className="flex items-start justify-between">
             <div className="flex flex-col gap-1">
               <span className="text-xs text-on-surface-variant uppercase tracking-wider font-semibold">
-                Hóa đơn T10/2024
+                Hóa đơn KTX
               </span>
-              <span className="text-xl sm:text-2xl text-error font-bold font-mono">
-                {pendingBill?.amount.toLocaleString('vi-VN')} đ
+              <span className={`text-xl sm:text-2xl font-bold font-mono ${pendingBill ? 'text-error' : 'text-on-surface'}`}>
+                {pendingBill ? `${pendingBill.amount.toLocaleString('vi-VN')} đ` : '0 đ'}
               </span>
             </div>
-            <div className="w-10 h-10 rounded-xl bg-error-container flex items-center justify-center text-error">
-              <span className="material-symbols-outlined text-[22px]">pending_actions</span>
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+              pendingBill ? 'bg-error-container text-error' : 'bg-surface-container text-on-surface-variant'
+            }`}>
+              <span className="material-symbols-outlined text-[22px]">
+                {pendingBill ? 'pending_actions' : 'check_circle'}
+              </span>
             </div>
           </div>
           <div className="mt-4 pt-3 flex flex-col gap-2 border-t border-surface-container-high/60">
             <div className="flex items-center justify-between">
               <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${
-                pendingBill?.status === 'paid' ? 'bg-secondary-fixed text-on-secondary-fixed' : 'bg-error-container text-on-error-container'
+                !pendingBill
+                  ? 'bg-secondary-fixed text-on-secondary-fixed'
+                  : pendingBill.status === 'paid'
+                  ? 'bg-secondary-fixed text-on-secondary-fixed'
+                  : 'bg-error-container text-on-error-container'
               }`}>
-                {pendingBill?.statusText}
+                {pendingBill ? pendingBill.statusText : 'Không có công nợ'}
               </span>
-              <span className="text-[11px] text-error font-semibold">Hạn: {pendingBill?.dueDate}</span>
+              {pendingBill && (
+                <span className="text-[11px] text-error font-semibold">Hạn: {pendingBill.dueDate}</span>
+              )}
             </div>
             <p className="text-xs text-on-surface-variant truncate">
-              Điện: {pendingBill?.electricKwh} kWh • Nước: {pendingBill?.waterM3} m³ • Phí vệ sinh
+              {pendingBill
+                ? `Điện: ${pendingBill.electricKwh || 0} kWh • Nước: ${pendingBill.waterM3 || 0} m³`
+                : 'Chưa phát sinh chi phí phòng / điện nước'}
             </p>
           </div>
         </div>
@@ -171,7 +241,7 @@ export const StudentOverviewApp: React.FC<StudentOverviewAppProps> = ({
                 Yêu cầu & Phản ánh
               </span>
               <span className="text-xl sm:text-2xl text-on-surface font-bold">
-                1 đang xử lý
+                {tickets.length > 0 ? `${tickets.filter(t => t.status !== 'completed').length} đang xử lý` : '0 yêu cầu'}
               </span>
             </div>
             <div className="w-10 h-10 rounded-xl bg-tertiary-fixed flex items-center justify-center text-tertiary">
@@ -179,16 +249,24 @@ export const StudentOverviewApp: React.FC<StudentOverviewAppProps> = ({
             </div>
           </div>
           <div className="mt-4 pt-3 flex flex-col gap-1 border-t border-surface-container-high/60">
-            <div className="flex items-center justify-between text-xs">
-              <span className="font-mono text-primary font-semibold">{tickets[0]?.id || '#SC-9102'}</span>
-              <span className="px-2 py-0.5 rounded-full bg-surface-container text-primary text-[11px] font-semibold">
-                {tickets[0]?.statusText || 'KTV Tiếp nhận'}
-              </span>
-            </div>
-            <p className="text-xs text-on-surface truncate">{tickets[0]?.title || 'Bóng đèn LED ban công chập chờn'}</p>
-            <span className="text-[11px] text-on-surface-variant truncate">
-              KTV: {tickets[0]?.ktvName || 'Trần Văn Nam'} phụ trách
-            </span>
+            {tickets.length > 0 ? (
+              <>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-mono text-primary font-semibold">{tickets[0]?.id}</span>
+                  <span className="px-2 py-0.5 rounded-full bg-surface-container text-primary text-[11px] font-semibold">
+                    {tickets[0]?.statusText}
+                  </span>
+                </div>
+                <p className="text-xs text-on-surface truncate">{tickets[0]?.title}</p>
+                <span className="text-[11px] text-on-surface-variant truncate">
+                  KTV: {tickets[0]?.ktvName} phụ trách
+                </span>
+              </>
+            ) : (
+              <div className="text-xs text-on-surface-variant py-1">
+                Không có sự cố kỹ thuật nào được ghi nhận
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -206,7 +284,9 @@ export const StudentOverviewApp: React.FC<StudentOverviewAppProps> = ({
                 </div>
                 <div>
                   <h2 className="text-base font-bold text-on-surface">Thông tin phòng ở & Bạn cùng phòng</h2>
-                  <p className="text-xs text-on-surface-variant">Phòng {info.roomNumber} • Tầng 4 • Tòa nhà {info.building} ({info.zone})</p>
+                  <p className="text-xs text-on-surface-variant">
+                    {isPending ? 'Chưa phân bổ phòng ở chính thức' : `Phòng ${info.roomNumber} • Tầng 4 • Tòa nhà ${info.building} (${info.zone})`}
+                  </p>
                 </div>
               </div>
               <div className="flex items-center gap-2 self-start sm:self-auto">
@@ -227,97 +307,120 @@ export const StudentOverviewApp: React.FC<StudentOverviewAppProps> = ({
               </div>
             </div>
 
-            {/* Room Specs & IoT Strip */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 rounded-xl bg-surface-container-low my-5 border border-surface-container-high/60">
-              <div className="flex items-center gap-2.5">
-                <span className="material-symbols-outlined text-primary text-[20px]">ac_unit</span>
-                <div className="flex flex-col">
-                  <span className="text-[11px] text-on-surface-variant">Điều hòa</span>
-                  <span className="text-xs font-semibold text-on-surface">{info.roomSpecs.airConditioner}</span>
+            {isPending ? (
+              <div className="py-10 px-4 rounded-xl bg-surface-container-low border border-dashed border-outline-variant/50 text-center flex flex-col items-center justify-center gap-3 my-4">
+                <div className="w-12 h-12 rounded-2xl bg-surface-container-high text-primary flex items-center justify-center">
+                  <span className="material-symbols-outlined text-[28px]">meeting_room</span>
                 </div>
-              </div>
-              <div className="flex items-center gap-2.5">
-                <span className="material-symbols-outlined text-secondary text-[20px]">water_heater</span>
-                <div className="flex flex-col">
-                  <span className="text-[11px] text-on-surface-variant">Bình nóng lạnh</span>
-                  <span className="text-xs font-semibold text-on-surface">{info.roomSpecs.waterHeater}</span>
+                <div className="flex flex-col gap-1 max-w-md">
+                  <h3 className="text-sm font-bold text-on-surface">Chưa có thông tin phòng & bạn cùng phòng</h3>
+                  <p className="text-xs text-on-surface-variant leading-relaxed">
+                    Hồ sơ đăng ký lưu trú của bạn đang được Ban Quản lý KTX thụ lý theo nguyện vọng <strong>{info.zone}</strong>. Sau khi xếp phòng hoàn tất, danh sách bạn cùng phòng và hệ thống công tơ IoT sẽ hiển thị tại đây.
+                  </p>
                 </div>
+                <button
+                  onClick={approveStudentRoom}
+                  className="mt-1 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-on-primary hover:bg-primary-container text-xs font-bold transition-all shadow-sm active:scale-95"
+                >
+                  <span className="material-symbols-outlined text-[18px]">domain_verification</span>
+                  <span>⚡ Mô phỏng Ban Quản lý xếp phòng</span>
+                </button>
               </div>
-              <div className="flex items-center gap-2.5">
-                <span className="material-symbols-outlined text-primary text-[20px]">bolt</span>
-                <div className="flex flex-col">
-                  <span className="text-[11px] text-on-surface-variant">Công tơ điện</span>
-                  <span className="text-xs font-semibold text-on-surface">{info.roomSpecs.electricMeter}</span>
-                </div>
-              </div>
-              <div className="flex items-center gap-2.5">
-                <span className="material-symbols-outlined text-secondary text-[20px]">water_drop</span>
-                <div className="flex flex-col">
-                  <span className="text-[11px] text-on-surface-variant">Đồng hồ nước</span>
-                  <span className="text-xs font-semibold text-on-surface">{info.roomSpecs.waterMeter}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Bed Occupancy Grid */}
-            <div className="flex flex-col gap-3">
-              <span className="text-xs font-semibold text-on-surface uppercase tracking-wider">
-                Danh sách vị trí giường (3/4 Đang ở)
-              </span>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                {info.roommates.map((mate) => (
-                  <div
-                    key={mate.id}
-                    className={`p-3.5 rounded-xl flex items-start justify-between border transition-all ${
-                      mate.isMe
-                        ? 'bg-surface-container-high/60 border-primary/30 ring-1 ring-primary/20'
-                        : 'bg-surface-container-low border-surface-container-high/60'
-                    }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="relative">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs ${
-                          mate.isMe ? 'bg-primary text-white' : 'bg-surface-container text-on-surface font-semibold'
-                        }`}>
-                          {mate.name.split(' ').map(w => w[0]).join('').slice(-2)}
-                        </div>
-                        <span className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center font-bold text-[9px] ${
-                          mate.isMe ? 'bg-secondary-container text-on-secondary-container' : 'bg-surface-container-high text-on-surface-variant'
-                        }`}>
-                          {mate.bed}
-                        </span>
-                      </div>
-                      <div className="flex flex-col">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold text-on-surface">{mate.name}</span>
-                          {mate.isMe && (
-                            <span className="px-1.5 py-0.5 rounded-full bg-primary text-on-primary text-[10px] font-semibold">
-                              Bạn • Trưởng phòng
-                            </span>
-                          )}
-                          {mate.bed === 'G4' && (
-                            <span className="px-1.5 py-0.5 rounded-full bg-surface-container text-on-surface-variant text-[10px]">
-                              Tân sinh viên
-                            </span>
-                          )}
-                        </div>
-                        <span className="text-[11px] text-on-surface-variant">{mate.faculty}</span>
-                        <span className="font-mono text-[11px] text-on-surface-variant flex items-center gap-1 mt-0.5">
-                          <span className="material-symbols-outlined text-[14px]">call</span>
-                          {mate.phone}
-                        </span>
-                      </div>
+            ) : (
+              <>
+                {/* Room Specs & IoT Strip */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 rounded-xl bg-surface-container-low my-5 border border-surface-container-high/60">
+                  <div className="flex items-center gap-2.5">
+                    <span className="material-symbols-outlined text-primary text-[20px]">ac_unit</span>
+                    <div className="flex flex-col">
+                      <span className="text-[11px] text-on-surface-variant">Điều hòa</span>
+                      <span className="text-xs font-semibold text-on-surface">{info.roomSpecs.airConditioner}</span>
                     </div>
-                    <span
-                      className={`w-2.5 h-2.5 rounded-full shrink-0 mt-1 ${
-                        mate.inRoom ? 'bg-primary' : 'bg-outline-variant'
-                      }`}
-                      title={mate.inRoom ? 'Đang trong phòng' : 'Chưa check-in hôm nay'}
-                    />
                   </div>
-                ))}
-              </div>
-            </div>
+                  <div className="flex items-center gap-2.5">
+                    <span className="material-symbols-outlined text-secondary text-[20px]">water_heater</span>
+                    <div className="flex flex-col">
+                      <span className="text-[11px] text-on-surface-variant">Bình nóng lạnh</span>
+                      <span className="text-xs font-semibold text-on-surface">{info.roomSpecs.waterHeater}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2.5">
+                    <span className="material-symbols-outlined text-primary text-[20px]">bolt</span>
+                    <div className="flex flex-col">
+                      <span className="text-[11px] text-on-surface-variant">Công tơ điện</span>
+                      <span className="text-xs font-semibold text-on-surface">{info.roomSpecs.electricMeter}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2.5">
+                    <span className="material-symbols-outlined text-secondary text-[20px]">water_drop</span>
+                    <div className="flex flex-col">
+                      <span className="text-[11px] text-on-surface-variant">Đồng hồ nước</span>
+                      <span className="text-xs font-semibold text-on-surface">{info.roomSpecs.waterMeter}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bed Occupancy Grid */}
+                <div className="flex flex-col gap-3">
+                  <span className="text-xs font-semibold text-on-surface uppercase tracking-wider">
+                    Danh sách vị trí giường ({info.roommates.length}/4 Đang ở)
+                  </span>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                    {info.roommates.map((mate) => (
+                      <div
+                        key={mate.id}
+                        className={`p-3.5 rounded-xl flex items-start justify-between border transition-all ${
+                          mate.isMe
+                            ? 'bg-surface-container-high/60 border-primary/30 ring-1 ring-primary/20'
+                            : 'bg-surface-container-low border-surface-container-high/60'
+                        }`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="relative">
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs ${
+                              mate.isMe ? 'bg-primary text-white' : 'bg-surface-container text-on-surface font-semibold'
+                            }`}>
+                              {mate.name.split(' ').map(w => w[0]).join('').slice(-2)}
+                            </div>
+                            <span className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center font-bold text-[9px] ${
+                              mate.isMe ? 'bg-secondary-container text-on-secondary-container' : 'bg-surface-container-high text-on-surface-variant'
+                            }`}>
+                              {mate.bed}
+                            </span>
+                          </div>
+                          <div className="flex flex-col">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-bold text-on-surface">{mate.name}</span>
+                              {mate.isMe && (
+                                <span className="px-1.5 py-0.5 rounded-full bg-primary text-on-primary text-[10px] font-semibold">
+                                  Bạn • Tân sinh viên
+                                </span>
+                              )}
+                              {mate.bed === 'G4' && (
+                                <span className="px-1.5 py-0.5 rounded-full bg-surface-container text-on-surface-variant text-[10px]">
+                                  Tân sinh viên
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-[11px] text-on-surface-variant">{mate.faculty}</span>
+                            <span className="font-mono text-[11px] text-on-surface-variant flex items-center gap-1 mt-0.5">
+                              <span className="material-symbols-outlined text-[14px]">call</span>
+                              {mate.phone}
+                            </span>
+                          </div>
+                        </div>
+                        <span
+                          className={`w-2.5 h-2.5 rounded-full shrink-0 mt-1 ${
+                            mate.inRoom ? 'bg-primary' : 'bg-outline-variant'
+                          }`}
+                          title={mate.inRoom ? 'Đang trong phòng' : 'Chưa check-in hôm nay'}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Widget 2: Maintenance & Fault Reporting Timeline */}
@@ -329,7 +432,9 @@ export const StudentOverviewApp: React.FC<StudentOverviewAppProps> = ({
                 </div>
                 <div>
                   <h2 className="text-base font-bold text-on-surface">Tiến độ xử lý phản ánh & Báo hỏng gần đây</h2>
-                  <p className="text-xs text-on-surface-variant">Theo dõi thời gian thực các sự cố kỹ thuật phòng 402</p>
+                  <p className="text-xs text-on-surface-variant">
+                    {isPending ? 'Theo dõi các sự cố kỹ thuật sau khi nhận phòng' : `Theo dõi thời gian thực các sự cố kỹ thuật phòng ${info.roomNumber}`}
+                  </p>
                 </div>
               </div>
               <button
@@ -342,67 +447,74 @@ export const StudentOverviewApp: React.FC<StudentOverviewAppProps> = ({
             </div>
 
             {/* Ticket Cards */}
-            <div className="flex flex-col gap-3 mt-4">
-              {tickets.map((ticket) => (
-                <div
-                  key={ticket.id}
-                  className="p-4 rounded-xl bg-surface-container-low hover:bg-surface-container transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4 border border-surface-container-high/60"
-                >
-                  <div className="flex items-start gap-3.5">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
-                      ticket.status === 'completed'
-                        ? 'bg-secondary-fixed text-on-secondary-fixed'
-                        : 'bg-primary-fixed text-primary'
-                    }`}>
-                      <span className="material-symbols-outlined text-[20px]">
-                        {ticket.category.includes('nước') ? 'plumbing' : 'lightbulb'}
-                      </span>
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-mono text-xs font-bold text-primary">#{ticket.id}</span>
-                        <span className="text-xs font-bold text-on-surface">{ticket.title}</span>
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-                          ticket.status === 'completed'
-                            ? 'bg-secondary-fixed text-on-secondary-fixed'
-                            : 'bg-primary-fixed text-on-primary-fixed'
-                        }`}>
-                          {ticket.statusText}
+            {tickets.length === 0 ? (
+              <div className="py-8 text-center text-xs text-on-surface-variant bg-surface-container-low rounded-xl border border-surface-container-high/60 mt-4">
+                <span className="material-symbols-outlined text-[32px] text-outline mb-1 block">check_circle</span>
+                Chưa có yêu cầu báo hỏng hoặc phản ánh sự cố kỹ thuật nào được ghi nhận.
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3 mt-4">
+                {tickets.map((ticket) => (
+                  <div
+                    key={ticket.id}
+                    className="p-4 rounded-xl bg-surface-container-low hover:bg-surface-container transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4 border border-surface-container-high/60"
+                  >
+                    <div className="flex items-start gap-3.5">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
+                        ticket.status === 'completed'
+                          ? 'bg-secondary-fixed text-on-secondary-fixed'
+                          : 'bg-primary-fixed text-primary'
+                      }`}>
+                        <span className="material-symbols-outlined text-[20px]">
+                          {ticket.category.includes('nước') ? 'plumbing' : 'lightbulb'}
                         </span>
                       </div>
-                      <p className="text-xs text-on-surface-variant">
-                        Gửi: <span className="text-on-surface font-medium">{ticket.timeSent}</span> • Tiếp nhận bởi KTV: <strong className="text-on-surface">{ticket.ktvName}</strong>
-                      </p>
-                      {ticket.ktvNote && (
-                        <div className="inline-flex items-center gap-1.5 text-primary text-[11px] mt-0.5">
-                          <span className="material-symbols-outlined text-[14px]">schedule</span>
-                          <span>Ghi chú KTV: &quot;{ticket.ktvNote}&quot;</span>
+                      <div className="flex flex-col gap-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-mono text-xs font-bold text-primary">#{ticket.id}</span>
+                          <span className="text-xs font-bold text-on-surface">{ticket.title}</span>
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                            ticket.status === 'completed'
+                              ? 'bg-secondary-fixed text-on-secondary-fixed'
+                              : 'bg-primary-fixed text-on-primary-fixed'
+                          }`}>
+                            {ticket.statusText}
+                          </span>
                         </div>
-                      )}
-                      {ticket.rating && (
-                        <div className="flex items-center gap-1 text-on-surface-variant text-[11px] mt-0.5">
-                          <span>Đánh giá của bạn:</span>
-                          <div className="flex text-amber-500">
-                            {[1, 2, 3, 4, 5].map((i) => (
-                              <span key={i} className="material-symbols-outlined text-[15px] fill-current">star</span>
-                            ))}
+                        <p className="text-xs text-on-surface-variant">
+                          Gửi: <span className="text-on-surface font-medium">{ticket.timeSent}</span> • Tiếp nhận bởi KTV: <strong className="text-on-surface">{ticket.ktvName}</strong>
+                        </p>
+                        {ticket.ktvNote && (
+                          <div className="inline-flex items-center gap-1.5 text-primary text-[11px] mt-0.5">
+                            <span className="material-symbols-outlined text-[14px]">schedule</span>
+                            <span>Ghi chú KTV: &quot;{ticket.ktvNote}&quot;</span>
                           </div>
-                          <span className="font-semibold text-on-surface">(Rất hài lòng)</span>
-                        </div>
-                      )}
+                        )}
+                        {ticket.rating && (
+                          <div className="flex items-center gap-1 text-on-surface-variant text-[11px] mt-0.5">
+                            <span>Đánh giá của bạn:</span>
+                            <div className="flex text-amber-500">
+                              {[1, 2, 3, 4, 5].map((i) => (
+                                <span key={i} className="material-symbols-outlined text-[15px] fill-current">star</span>
+                              ))}
+                            </div>
+                            <span className="font-semibold text-on-surface">(Rất hài lòng)</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0 self-end md:self-auto">
+                      <button
+                        onClick={() => alert(`Chi tiết sự cố #${ticket.id}: ${ticket.title} - Tiếp nhận: ${ticket.ktvName}`)}
+                        className="px-3 py-1.5 rounded-lg bg-surface-container-lowest text-on-surface hover:bg-surface-container text-xs font-semibold transition-colors shadow-xs border border-outline-variant/30"
+                      >
+                        {ticket.status === 'completed' ? 'Xem nghiệm thu' : 'Chi tiết'}
+                      </button>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0 self-end md:self-auto">
-                    <button
-                      onClick={() => alert(`Chi tiết sự cố #${ticket.id}: ${ticket.title} - Tiếp nhận: ${ticket.ktvName}`)}
-                      className="px-3 py-1.5 rounded-lg bg-surface-container-lowest text-on-surface hover:bg-surface-container text-xs font-semibold transition-colors shadow-xs border border-outline-variant/30"
-                    >
-                      {ticket.status === 'completed' ? 'Xem nghiệm thu' : 'Chi tiết'}
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Widget 3: Billing & Payment Periods */}
@@ -427,60 +539,67 @@ export const StudentOverviewApp: React.FC<StudentOverviewAppProps> = ({
             </div>
 
             {/* Billing Table */}
-            <div className="overflow-x-auto mt-3">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="bg-surface-container-low text-on-surface-variant text-[11px] uppercase tracking-wider">
-                    <th className="py-3 px-4 rounded-l-lg font-semibold">Kỳ hóa đơn</th>
-                    <th className="py-3 px-4 font-semibold">Khoản thu</th>
-                    <th className="py-3 px-4 font-semibold">Số tiền</th>
-                    <th className="py-3 px-4 font-semibold">Hạn thanh toán</th>
-                    <th className="py-3 px-4 font-semibold">Trạng thái</th>
-                    <th className="py-3 px-4 text-right rounded-r-lg font-semibold">Hành động</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-surface-container-high/40">
-                  {bills.map((bill) => (
-                    <tr key={bill.id} className="hover:bg-surface-container-low/50 transition-colors">
-                      <td className="py-3.5 px-4 font-bold text-on-surface whitespace-nowrap">{bill.month}</td>
-                      <td className="py-3.5 px-4 text-on-surface-variant">{bill.period}</td>
-                      <td className={`py-3.5 px-4 font-bold font-mono ${bill.status === 'pending' ? 'text-error' : 'text-on-surface'}`}>
-                        {bill.amount.toLocaleString('vi-VN')} đ
-                      </td>
-                      <td className="py-3.5 px-4 text-on-surface-variant">{bill.dueDate}</td>
-                      <td className="py-3.5 px-4">
-                        <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
-                          bill.status === 'pending'
-                            ? 'bg-error-container text-on-error-container'
-                            : 'bg-secondary-fixed text-on-secondary-fixed'
-                        }`}>
-                          {bill.statusText}
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-4 text-right whitespace-nowrap">
-                        {bill.status === 'pending' ? (
-                          <button
-                            onClick={onOpenPayBill}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-on-primary hover:bg-primary-container text-xs font-semibold transition-colors shadow-xs"
-                          >
-                            <span className="material-symbols-outlined text-[16px]">qr_code_scanner</span>
-                            <span>VNPay / MoMo</span>
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => alert(`Biên lai điện tử #${bill.id}: Đã quyết toán qua cổng tài vụ ĐHQG.`)}
-                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-surface-container text-on-surface hover:bg-surface-container-high text-xs font-medium transition-colors"
-                          >
-                            <span className="material-symbols-outlined text-[16px]">description</span>
-                            <span>Xem biên lai</span>
-                          </button>
-                        )}
-                      </td>
+            {bills.length === 0 ? (
+              <div className="py-8 text-center text-xs text-on-surface-variant bg-surface-container-low rounded-xl border border-surface-container-high/60 mt-4">
+                <span className="material-symbols-outlined text-[32px] text-outline mb-1 block">receipt</span>
+                Hiện tại bạn chưa phát sinh hóa đơn tiền phòng hoặc điện nước nào.
+              </div>
+            ) : (
+              <div className="overflow-x-auto mt-3">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="bg-surface-container-low text-on-surface-variant text-[11px] uppercase tracking-wider">
+                      <th className="py-3 px-4 rounded-l-lg font-semibold">Kỳ hóa đơn</th>
+                      <th className="py-3 px-4 font-semibold">Khoản thu</th>
+                      <th className="py-3 px-4 font-semibold">Số tiền</th>
+                      <th className="py-3 px-4 font-semibold">Hạn thanh toán</th>
+                      <th className="py-3 px-4 font-semibold">Trạng thái</th>
+                      <th className="py-3 px-4 text-right rounded-r-lg font-semibold">Hành động</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y divide-surface-container-high/40">
+                    {bills.map((bill) => (
+                      <tr key={bill.id} className="hover:bg-surface-container-low/50 transition-colors">
+                        <td className="py-3.5 px-4 font-bold text-on-surface whitespace-nowrap">{bill.month}</td>
+                        <td className="py-3.5 px-4 text-on-surface-variant">{bill.period}</td>
+                        <td className={`py-3.5 px-4 font-bold font-mono ${bill.status === 'pending' ? 'text-error' : 'text-on-surface'}`}>
+                          {bill.amount.toLocaleString('vi-VN')} đ
+                        </td>
+                        <td className="py-3.5 px-4 text-on-surface-variant">{bill.dueDate}</td>
+                        <td className="py-3.5 px-4">
+                          <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
+                            bill.status === 'pending'
+                              ? 'bg-error-container text-on-error-container'
+                              : 'bg-secondary-fixed text-on-secondary-fixed'
+                          }`}>
+                            {bill.statusText}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                          {bill.status === 'pending' ? (
+                            <button
+                              onClick={onOpenPayBill}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-on-primary hover:bg-primary-container text-xs font-semibold transition-colors shadow-xs"
+                            >
+                              <span className="material-symbols-outlined text-[16px]">qr_code_scanner</span>
+                              <span>VNPay / MoMo</span>
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => alert(`Biên lai điện tử #${bill.id}: Đã quyết toán qua cổng tài vụ ĐHQG.`)}
+                              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-surface-container text-on-surface hover:bg-surface-container-high text-xs font-medium transition-colors"
+                            >
+                              <span className="material-symbols-outlined text-[16px]">description</span>
+                              <span>Xem biên lai</span>
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
 
@@ -507,7 +626,7 @@ export const StudentOverviewApp: React.FC<StudentOverviewAppProps> = ({
                   </span>
                   <span className="text-[11px] text-on-surface-variant font-mono">23/10/2024</span>
                 </div>
-                <h3 className="text-xs font-bold text-on-surface">Lịch bảo dưỡng & súc rửa téc nước Tòa B2</h3>
+                <h3 className="text-xs font-bold text-on-surface">Lịch bảo dưỡng & súc rửa téc nước</h3>
                 <p className="text-xs text-on-surface-variant leading-relaxed">
                   Tạm ngừng cấp nước sinh hoạt từ <strong>08:00 - 12:00 Thứ 7 (26/10)</strong> để bảo dưỡng hệ thống bơm tăng áp tòa nhà. Sinh viên vui lòng tích trữ nước sạch.
                 </p>
@@ -642,10 +761,10 @@ export const StudentOverviewApp: React.FC<StudentOverviewAppProps> = ({
               </div>
               <h3 className="text-base font-bold text-on-primary">Giải bóng đá sinh viên KTX 2024</h3>
               <p className="text-xs text-on-primary/80 leading-relaxed">
-                Khởi tranh tuần sau tại Sân cỏ nhân tạo Khu A. Phòng 402 đã đăng ký tham gia!
+                Khởi tranh tuần sau tại Sân cỏ nhân tạo Khu A. {info.roomNumber ? `Phòng ${info.roomNumber}` : 'Sinh viên toàn KTX'} đã đăng ký tham gia!
               </p>
               <button
-                onClick={() => alert('Lịch thi đấu bảng B: Phòng 402 gặp Phòng 308 lúc 16:30 Thứ Ba.')}
+                onClick={() => alert(`Lịch thi đấu bảng B: ${info.roomNumber ? `Phòng ${info.roomNumber}` : 'Đội bóng KTX'} gặp Phòng 308 lúc 16:30 Thứ Ba.`)}
                 className="mt-2 px-4 py-2 rounded-lg bg-surface-container-lowest text-primary text-xs font-bold hover:bg-surface-container transition-colors w-fit"
               >
                 Xem lịch thi đấu

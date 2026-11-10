@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ChatMessage } from '../../core/types';
 import { api } from '../../core/api';
+import { useStore } from '../../store/useStore';
 
 interface StudentAiChatDrawerProps {
   isOpen: boolean;
@@ -8,38 +9,20 @@ interface StudentAiChatDrawerProps {
   onClose: () => void;
 }
 
-const INITIAL_MESSAGES: ChatMessage[] = [
-  {
-    id: 'msg-1',
-    sender: 'bot',
-    text: 'Xin chào bạn Hoàng Nam! 👋 Mình là Trợ lý AI SmartDorm. Mình có thể hỗ trợ bạn tra cứu thông tin phòng P.402, hướng dẫn chuyển phòng/gia hạn, giải thích hóa đơn hoặc tiếp nhận báo hỏng sự cố nhé!',
-    time: '08:42'
-  },
-  {
-    id: 'msg-2',
-    sender: 'user',
-    text: 'Hồ sơ xin chuyển sang phòng đơn học kỳ 2 của mình đã được duyệt chưa?',
-    time: '08:44'
-  },
-  {
-    id: 'msg-3',
-    sender: 'bot',
-    text: 'Dạ chào Nam, theo dữ liệu từ Ban Quản lý KTX lúc 08:45 hôm nay:\n⏱️ Thời gian dự kiến: Trước ngày 28/10/2024. Bạn sẽ nhận được SMS và thông báo trên Cổng ngay khi Quản lý Nguyễn Thu Trang duyệt nhé!\n💡 Cần hỗ trợ gấp, bạn có thể gọi hotline Tòa B: Máy lẻ 104.',
-    time: '08:45',
-    details: {
-      code: '#DK-24098',
-      wish: 'Chuyển sang B402 (Phòng 2 người/Đơn)',
-      status: 'Chờ cán bộ xét duyệt'
-    }
-  }
-];
-
 export const StudentAiChatDrawer: React.FC<StudentAiChatDrawerProps> = ({
   isOpen,
   onToggle,
   onClose
 }) => {
-  const [messages, setMessages] = useState<ChatMessage[]>(INITIAL_MESSAGES);
+  const { studentInfo } = useStore();
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    {
+      id: 'msg-1',
+      sender: 'bot',
+      text: `Xin chào bạn ${studentInfo.fullName}! 👋 Mình là Trợ lý AI SmartDorm. Mình có thể hỗ trợ bạn tra cứu thông tin ${studentInfo.roomNumber ? `phòng P.${studentInfo.roomNumber}` : 'đăng ký KTX'}, hướng dẫn chuyển phòng/gia hạn, giải thích hóa đơn hoặc tiếp nhận báo hỏng sự cố nhé!`,
+      time: '08:42'
+    }
+  ]);
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);

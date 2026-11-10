@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { api } from '../../core/api';
 import { eventBus, EVENTS } from '../../core/bus';
+import { useStore } from '../../store/useStore';
 
 interface StudentReportFaultModalProps {
   isOpen: boolean;
@@ -13,6 +14,7 @@ export const StudentReportFaultModal: React.FC<StudentReportFaultModalProps> = (
   onClose,
   onTicketCreated
 }) => {
+  const { studentInfo } = useStore();
   const [category, setCategory] = useState('Hệ thống điện & Bóng đèn chiếu sáng');
   const [description, setDescription] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -30,7 +32,7 @@ export const StudentReportFaultModal: React.FC<StudentReportFaultModalProps> = (
     try {
       await api.createStudentTicket(category, description);
       onTicketCreated();
-      eventBus.emit(EVENTS.SHOW_TOAST, 'Đã gửi báo hỏng phòng 402 tới Tổ Kỹ thuật KTX!');
+      eventBus.emit(EVENTS.SHOW_TOAST, `Đã gửi báo hỏng ${studentInfo.roomNumber ? `phòng ${studentInfo.roomNumber}` : 'KTX'} tới Tổ Kỹ thuật!`);
       onClose();
       setDescription('');
     } catch {
@@ -51,7 +53,7 @@ export const StudentReportFaultModal: React.FC<StudentReportFaultModalProps> = (
             </div>
             <div className="flex flex-col">
               <h3 className="text-base font-bold text-on-surface">Gửi báo hỏng & Sự cố phòng</h3>
-              <span className="text-xs text-on-surface-variant">Phòng 402 - Tòa B2 • Trưởng phòng: Đặng Hoàng Nam</span>
+              <span className="text-xs text-on-surface-variant">{studentInfo.roomNumber ? `Phòng ${studentInfo.roomNumber} - Tòa ${studentInfo.building}` : studentInfo.zone} • Sinh viên: {studentInfo.fullName}</span>
             </div>
           </div>
           <button

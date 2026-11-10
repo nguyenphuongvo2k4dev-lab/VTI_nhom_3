@@ -9,8 +9,26 @@ import {
   StudentTicket
 } from '../core/types';
 import { api } from '../core/api';
+import {
+  DEMO_STUDENT,
+  createPendingStudentInfo,
+  createApprovedStudentInfo,
+  createInitialStudentBill
+} from './studentDefaults';
 
 export type UserRole = 'student' | 'manager' | 'technician' | 'admin';
+
+export interface RegisteredUser {
+  fullName: string;
+  studentId: string;
+  email: string;
+  phone: string;
+  university?: string;
+  dormArea?: string;
+  roomType?: string;
+  password?: string;
+  createdAt?: string;
+}
 
 interface StoreState {
   // Auth & Session
@@ -54,7 +72,10 @@ interface StoreState {
   studentTickets: StudentTicket[];
 
   // Actions
-  login: (role: UserRole, identifier?: string) => void;
+  login: (role: UserRole, identifier?: string, password?: string) => boolean;
+  registerStudent: (data: RegisteredUser) => boolean;
+  setStudentInfo: (info: Partial<StudentInfo>) => void;
+  approveStudentRoom: () => void;
   logout: () => void;
   setRole: (role: UserRole) => void;
   setLang: (lang: 'VIE' | 'ENG') => void;
@@ -85,12 +106,31 @@ interface StoreState {
   createStudentTicket: (category: string, description: string) => Promise<void>;
 }
 
+const getInitialSession = () => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem('smartdorm_current_user');
+    if (raw) return JSON.parse(raw);
+  } catch {
+    // ignore
+  }
+  return null;
+};
+
+const initialSession = getInitialSession();
+
+const createStudentInfoForUser = (user: RegisteredUser, baseInfo: StudentInfo): StudentInfo => {
+  const isApproved = typeof window !== 'undefined' && localStorage.getItem(`smartdorm_user_approved_${user.studentId}`) === 'true';
+  const pending = createPendingStudentInfo(user, baseInfo);
+  return isApproved ? createApprovedStudentInfo(pending) : pending;
+};
+
 export const useStore = create<StoreState>((set, get) => ({
   // Defaults
   isAuthenticated: true,
   currentRole: 'student',
-  userName: 'Đặng Hoàng Nam',
-  userEmail: 'nam.dh@student.vnu.edu.vn',
+  userName: initialSession?.userName || 'Đặng Hoàng Nam',
+  userEmail: initialSession?.userEmail || 'nam.dh@student.vnu.edu.vn',
   lang: 'VIE',
 
   commandPaletteOpen: false,
@@ -132,42 +172,54 @@ export const useStore = create<StoreState>((set, get) => ({
   tariffs: [],
   securityAlerts: [],
 
-  studentInfo: {
-    fullName: 'Đặng Hoàng Nam',
-    studentId: '22120045',
-    faculty: 'Khoa CNTT & Truyền thông',
-    className: 'CNTT-K22A',
-    cohort: 'K22',
-    phone: '0912 345 678',
-    room: 'P.402 - Nhà B2 (Khu B)',
-    roomNumber: '402',
-    building: 'B2',
-    zone: 'Khu B (Nam sinh viên)',
-    bedSlot: 'G1',
-    isLeader: true,
-    contract: {
-      id: 'HD-2024-8841',
-      daysLeft: 74,
-      expiryDate: '31/12/2024',
-      renewalStartDate: '01/12/2024'
-    },
-    roommates: [
-      { id: '1', bed: 'G1', name: 'Đặng Hoàng Nam', role: 'Bạn • Trưởng phòng', faculty: 'Khoa CNTT & Truyền thông • K22', phone: '0912 345 678', inRoom: true, isMe: true },
-      { id: '2', bed: 'G2', name: 'Nguyễn Tiến Đạt', role: 'Sinh viên', faculty: 'Khoa Điện tử Viễn thông • K22', phone: '0984 112 334', inRoom: true },
-      { id: '3', bed: 'G3', name: 'Lê Bảo Minh', role: 'Sinh viên', faculty: 'Khoa Kinh tế Đối ngoại • K23', phone: '0905 889 211', inRoom: true },
-      { id: '4', bed: 'G4', name: 'Phạm Tuấn Hưng', role: 'Tân sinh viên', faculty: 'Khoa Khoa học Máy tính • K24', phone: '0977 441 902', inRoom: false }
-    ],
-    roomSpecs: {
-      airConditioner: '12.000 BTU Inverter',
-      waterHeater: 'Ariston 30L',
-      electricMeter: '1,420 kWh (IoT)',
-      waterMeter: '112 m³ (IoT)'
-    }
-  },
+  studentInfo: initialSession?.studentInfo || DEMO_STUDENT,
   studentBills: [],
   studentTickets: [],
 
-  login: (role, identifier) => {
+  login: (role, identifier, password) => {
+    if (typeof window !== 'undefined' && identifier) {
+      const savedUsersStr = localStorage.getItem('smartdorm_users');
+      if (savedUsersStr) {
+        try {
+          const users: RegisteredUser[] = JSON.parse(savedUsersStr);
+          const found = users.find(u => 
+            (u.studentId && u.studentId.toLowerCase() === identifier.toLowerCase().trim()) ||
+            (u.email && u.email.toLowerCase() === identifier.toLowerCase().trim())
+          );
+          if (found) {
+            if (password && found.password && found.password !== password) {
+              get().showToast('Mật khẩu không chính xác. Vui lòng thử lại!');
+              return false;
+            }
+            const updatedInfo = createStudentInfoForUser(found, get().studentInfo);
+            const isApproved = updatedInfo.status === 'active';
+            const userBills: StudentBill[] = isApproved ? [createInitialStudentBill(found.studentId)] : [];
+
+            set({
+              isAuthenticated: true,
+              currentRole: 'student',
+              userName: found.fullName,
+              userEmail: found.email,
+              studentInfo: updatedInfo,
+              studentBills: userBills,
+              studentTickets: []
+            });
+
+            localStorage.setItem('smartdorm_current_user', JSON.stringify({
+              userName: found.fullName,
+              userEmail: found.email,
+              studentInfo: updatedInfo
+            }));
+
+            get().showToast(`Đăng nhập thành công! Chào mừng ${found.fullName}`);
+            return true;
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    }
+
     let name = 'Đặng Hoàng Nam';
     let email = 'nam.dh@student.vnu.edu.vn';
     if (role === 'admin') {
@@ -190,10 +242,103 @@ export const useStore = create<StoreState>((set, get) => ({
       userEmail: email
     });
     get().showToast(`Đăng nhập thành công với vai trò ${role.toUpperCase()}!`);
+    return true;
+  },
+
+  registerStudent: (data) => {
+    try {
+      if (typeof window !== 'undefined') {
+        const savedUsersStr = localStorage.getItem('smartdorm_users');
+        let users: RegisteredUser[] = [];
+        if (savedUsersStr) {
+          try {
+            users = JSON.parse(savedUsersStr);
+          } catch {
+            users = [];
+          }
+        }
+        users = users.filter(u => u.studentId !== data.studentId && u.email !== data.email);
+        users.unshift(data);
+        localStorage.setItem('smartdorm_users', JSON.stringify(users));
+      }
+
+      const updatedInfo = createStudentInfoForUser(data, get().studentInfo);
+
+      set({
+        isAuthenticated: true,
+        currentRole: 'student',
+        userName: data.fullName,
+        userEmail: data.email,
+        studentInfo: updatedInfo,
+        studentBills: [],
+        studentTickets: []
+      });
+
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('smartdorm_current_user', JSON.stringify({
+          userName: data.fullName,
+          userEmail: data.email,
+          studentInfo: updatedInfo
+        }));
+        localStorage.setItem('smartdorm_last_registered', JSON.stringify({
+          identifier: data.studentId,
+          password: data.password
+        }));
+      }
+
+      get().showToast(`Đăng ký tài khoản thành công! Chào mừng ${data.fullName}`);
+      return true;
+    } catch (e) {
+      console.error(e);
+      return false;
+    }
+  },
+
+  setStudentInfo: (info) => {
+    const updated = { ...get().studentInfo, ...info };
+    set({ studentInfo: updated });
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('smartdorm_current_user', JSON.stringify({
+        userName: get().userName,
+        userEmail: get().userEmail,
+        studentInfo: updated
+      }));
+    }
+  },
+
+  approveStudentRoom: async () => {
+    const cur = get().studentInfo;
+    const approvedInfo = createApprovedStudentInfo(cur);
+    const initialBills = [createInitialStudentBill(cur.studentId)];
+
+    set({
+      studentInfo: approvedInfo,
+      studentBills: initialBills
+    });
+
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(`smartdorm_user_approved_${cur.studentId}`, 'true');
+      localStorage.setItem('smartdorm_current_user', JSON.stringify({
+        userName: get().userName,
+        userEmail: get().userEmail,
+        studentInfo: approvedInfo
+      }));
+    }
+
+    try {
+      await api.approveStudentRoom();
+    } catch {
+      // offline fallback
+    }
+
+    get().showToast(`🎉 Ban Quản lý đã duyệt hồ sơ! Đã xếp bạn vào Phòng ${approvedInfo.roomNumber} - Nhà ${approvedInfo.building}`);
   },
 
   logout: () => {
     set({ isAuthenticated: false });
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('smartdorm_current_user');
+    }
     get().showToast('Đã đăng xuất khỏi hệ thống SmartDorm.');
   },
 
@@ -244,14 +389,35 @@ export const useStore = create<StoreState>((set, get) => ({
         api.getStudentBills(),
         api.getStudentTickets()
       ]);
+
+      let savedStudentInfo = null;
+      let savedUserName = null;
+      let savedUserEmail = null;
+      if (typeof window !== 'undefined') {
+        try {
+          const raw = localStorage.getItem('smartdorm_current_user');
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            savedStudentInfo = parsed.studentInfo;
+            savedUserName = parsed.userName;
+            savedUserEmail = parsed.userEmail;
+          }
+        } catch {}
+      }
+
+      const activeInfo = savedStudentInfo || sInfo || get().studentInfo;
+      const isPending = activeInfo?.status === 'pending' || !activeInfo?.roomNumber;
+
       set({
         stats: s || get().stats,
         auditLogs: l?.items || get().auditLogs,
         tariffs: t || get().tariffs,
         securityAlerts: a || get().securityAlerts,
-        studentInfo: sInfo || get().studentInfo,
-        studentBills: sBills || get().studentBills,
-        studentTickets: sTickets || get().studentTickets
+        studentInfo: activeInfo,
+        studentBills: isPending ? [] : (sBills || get().studentBills),
+        studentTickets: isPending ? [] : (sTickets || get().studentTickets),
+        userName: savedUserName || get().userName,
+        userEmail: savedUserEmail || get().userEmail
       });
     } catch (e) {
       console.warn('Zustand loadAllData error', e);

@@ -1,4 +1,5 @@
 import React from 'react';
+import { useStore } from '../../store/useStore';
 
 interface StudentRoomRulesModalProps {
   isOpen: boolean;
@@ -6,6 +7,7 @@ interface StudentRoomRulesModalProps {
 }
 
 export const StudentRoomRulesModal: React.FC<StudentRoomRulesModalProps> = ({ isOpen, onClose }) => {
+  const { studentInfo } = useStore();
   if (!isOpen) return null;
 
   return (
@@ -17,7 +19,7 @@ export const StudentRoomRulesModal: React.FC<StudentRoomRulesModalProps> = ({ is
               <span className="material-symbols-outlined text-[22px]">menu_book</span>
             </div>
             <div>
-              <h3 className="text-base font-bold text-on-surface">Quy Ước Phòng 402 & Nội Quy KTX</h3>
+              <h3 className="text-base font-bold text-on-surface">Quy Ước {studentInfo.roomNumber ? `Phòng ${studentInfo.roomNumber}` : 'Nội Trú'} & Nội Quy KTX</h3>
               <p className="text-xs text-outline">Quy định nếp sống văn minh KTX ĐHQG</p>
             </div>
           </div>

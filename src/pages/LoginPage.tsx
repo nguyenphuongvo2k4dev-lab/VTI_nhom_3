@@ -7,8 +7,20 @@ export const LoginPage: React.FC = () => {
   const { login, lang, setLang } = useStore();
 
   const [authTab, setAuthTab] = useState<'form' | 'qr'>('form');
-  const [identifier, setIdentifier] = useState('22120045');
-  const [password, setPassword] = useState('smartdorm@2024');
+  const [identifier, setIdentifier] = useState(() => {
+    try {
+      const raw = localStorage.getItem('smartdorm_last_registered');
+      if (raw) return JSON.parse(raw)?.identifier || '22120045';
+    } catch {}
+    return '22120045';
+  });
+  const [password, setPassword] = useState(() => {
+    try {
+      const raw = localStorage.getItem('smartdorm_last_registered');
+      if (raw) return JSON.parse(raw)?.password || 'smartdorm@2024';
+    } catch {}
+    return 'smartdorm@2024';
+  });
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -22,9 +34,11 @@ export const LoginPage: React.FC = () => {
 
     setLoading(true);
     setTimeout(() => {
-      login('student', identifier);
+      const ok = login('student', identifier, password);
       setLoading(false);
-      navigate('/student/overview');
+      if (ok) {
+        navigate('/student/overview');
+      }
     }, 600);
   };
 
