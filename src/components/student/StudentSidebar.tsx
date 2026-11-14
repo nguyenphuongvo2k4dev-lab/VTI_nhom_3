@@ -1,12 +1,11 @@
 import React from 'react';
-import { StudentAppId, PortalMode } from '../../core/types';
+import { StudentAppId } from '../../core/types';
 
 interface StudentSidebarProps {
   currentPath: StudentAppId;
   onNavigate: (path: StudentAppId) => void;
   mobileOpen: boolean;
   onCloseMobile: () => void;
-  onSwitchPortal?: (mode: PortalMode) => void;
   onOpenRules: () => void;
 }
 
@@ -27,7 +26,6 @@ export const StudentSidebar: React.FC<StudentSidebarProps> = ({
   onNavigate,
   mobileOpen,
   onCloseMobile,
-  onSwitchPortal,
   onOpenRules
 }) => {
   return (

@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useStore } from '../store/useStore';
+import { parseJsonResponse } from '../core/api';
 
 export const RegisterPage: React.FC = () => {
   const navigate = useNavigate();
@@ -8,23 +9,18 @@ export const RegisterPage: React.FC = () => {
 
   // Form states
   const [activeStep, setActiveStep] = useState<number>(1);
-  const [university, setUniversity] = useState('bk');
-  const [studentId, setStudentId] = useState('24120892');
-  const [checkingStudent, setCheckingStudent] = useState(false);
-  const [studentVerified, setStudentVerified] = useState(true);
-  const [cccd, setCccd] = useState('079204018992');
-  const [fullName, setFullName] = useState('NGUYỄN HOÀNG NAM');
-  const [birthDate, setBirthDate] = useState('18/09/2006');
+  const [university, setUniversity] = useState('');
+  const [studentId, setStudentId] = useState('');
+  const [cccd, setCccd] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [birthDate, setBirthDate] = useState('');
   const [gender, setGender] = useState<'male' | 'female'>('male');
 
   // Group 2 states
-  const [email, setEmail] = useState('nam.nh24@student.edu.vn');
-  const [phone, setPhone] = useState('0987 654 321');
-  const [otpCount, setOtpCount] = useState<number>(58);
-  const [otpRunning, setOtpRunning] = useState<boolean>(true);
-  const [otpDigits, setOtpDigits] = useState<string[]>(['5', '8', '2', '9', '4', '1']);
-  const [password, setPassword] = useState('VnuDorm#2024Secure');
-  const [confirmPassword, setConfirmPassword] = useState('VnuDorm#2024Secure');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
@@ -37,70 +33,16 @@ export const RegisterPage: React.FC = () => {
     martyr: false,
     none: true,
   });
-  const [agreeTerms, setAgreeTerms] = useState(true);
-  const [agreeNotify, setAgreeNotify] = useState(true);
+  const [agreeTerms, setAgreeTerms] = useState(false);
+  const [agreeNotify, setAgreeNotify] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submittedSuccess, setSubmittedSuccess] = useState(false);
-
-  // OTP Countdown timer
-  useEffect(() => {
-    let timer: NodeJS.Timeout;
-    if (otpRunning && otpCount > 0) {
-      timer = setInterval(() => {
-        setOtpCount((prev) => {
-          if (prev <= 1) {
-            setOtpRunning(false);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    }
-    return () => clearInterval(timer);
-  }, [otpRunning, otpCount]);
-
-  const handleSendOtp = () => {
-    setOtpCount(60);
-    setOtpRunning(true);
-    showToast('Đã gửi mã xác thực OTP 6 số đến ' + phone);
-  };
-
-  const handleCheckStudent = () => {
-    if (!studentId.trim()) {
-      showToast('Vui lòng nhập Mã số sinh viên trước khi kiểm tra.');
-      return;
-    }
-    setCheckingStudent(true);
-    setTimeout(() => {
-      setCheckingStudent(false);
-      setStudentVerified(true);
-      if (studentId === '24120892') {
-        setFullName('NGUYỄN HOÀNG NAM');
-        setCccd('079204018992');
-        setEmail('nam.nh24@student.edu.vn');
-      } else {
-        setFullName('TRẦN MINH QUÂN');
-        setCccd('079205001234');
-        setEmail(`${studentId.toLowerCase()}@student.edu.vn`);
-      }
-      showToast('Đã đối soát thành công dữ liệu tuyển sinh ĐHQG K24');
-    }, 700);
-  };
-
-  const handleOtpChange = (index: number, val: string) => {
-    if (val.length > 1) {
-      val = val.slice(-1);
-    }
-    const newDigits = [...otpDigits];
-    newDigits[index] = val;
-    setOtpDigits(newDigits);
-
-    // Auto focus next input if digit typed
-    if (val && index < 5) {
-      const nextInput = document.getElementById(`otp-input-${index + 1}`);
-      if (nextInput) nextInput.focus();
-    }
-  };
+  const passwordStrength = [
+    password.length >= 8,
+    /[a-z]/.test(password) && /[A-Z]/.test(password),
+    /\d/.test(password),
+    /[^A-Za-z0-9]/.test(password)
+  ].filter(Boolean).length;
 
   const handleSaveDraft = () => {
     const draft = {
@@ -119,32 +61,73 @@ export const RegisterPage: React.FC = () => {
       localStorage.setItem('smartdorm_registration_draft', JSON.stringify(draft));
       showToast('Đã lưu bản nháp hồ sơ thành công vào bộ nhớ trình duyệt.');
     } catch {
-      showToast('Bản nháp đã được lưu.');
+      showToast('Không thể lưu bản nháp vào bộ nhớ trình duyệt.');
     }
   };
 
-  const handleSubmit = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
 
     if (!agreeTerms) {
-      alert('Vui lòng đọc và tích chọn đồng ý tuân thủ Nội quy Ký túc xá ĐHQG.');
+      showToast('Vui lòng đồng ý với nội quy Ký túc xá trước khi đăng ký.');
+      return;
+    }
+    if (!university || !studentId.trim() || !fullName.trim() || !/^\d{12}$/.test(cccd.trim()) || !/^\d{2}\/\d{2}\/\d{4}$/.test(birthDate)) {
+      showToast('Vui lòng nhập đầy đủ trường, MSSV, họ tên, CCCD 12 số và ngày sinh theo DD/MM/YYYY.');
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) || phone.replace(/\D/g, '').length < 10) {
+      showToast('Vui lòng nhập email hợp lệ và số điện thoại ít nhất 10 chữ số.');
       return;
     }
     if (password !== confirmPassword) {
-      alert('Mật khẩu và xác nhận mật khẩu chưa trùng khớp.');
+      showToast('Mật khẩu và xác nhận mật khẩu chưa trùng khớp.');
+      return;
+    }
+    if (passwordStrength < 4) {
+      showToast('Mật khẩu cần đủ 8 ký tự, chữ hoa, chữ thường, số và ký tự đặc biệt.');
       return;
     }
 
     setSubmitting(true);
-    setTimeout(() => {
-      setSubmitting(false);
+    try {
+      const response = await fetch('/api/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          university,
+          studentId: studentId.trim(),
+          cccd: cccd.trim(),
+          fullName: fullName.trim(),
+          birthDate,
+          gender,
+          email: email.trim(),
+          phone: phone.trim(),
+          dormArea,
+          roomType,
+          priorityPolicies,
+          agreeTerms,
+          agreeNotify,
+          password
+        })
+      });
+      const result = await parseJsonResponse<{
+        success: boolean;
+        user: { studentId: string; fullName: string; email: string };
+      }>(response);
+
       setSubmittedSuccess(true);
-      login('student', studentId || '24120892');
-      showToast('Kích hoạt tài khoản và nộp hồ sơ KTX K24 thành công!');
+      login('student', result.user);
+      await useStore.getState().loadAllData();
+      showToast('Đăng ký tài khoản và nộp hồ sơ KTX thành công!');
       setTimeout(() => {
         navigate('/student/overview');
       }, 1000);
-    }, 1200);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Có lỗi khi đăng ký. Vui lòng thử lại.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -257,8 +240,8 @@ export const RegisterPage: React.FC = () => {
                       {activeStep === 1 ? 'Bước 1 • Đang thực hiện' : 'Bước 1'}
                     </span>
                   </div>
-                  <p className="text-sm font-bold text-on-surface truncate">Xác thực danh tính</p>
-                  <p className="text-xs text-on-surface-variant truncate">Dữ liệu học vụ & tài khoản</p>
+                  <p className="text-sm font-bold text-on-surface truncate">Thông tin cá nhân</p>
+                  <p className="text-xs text-on-surface-variant truncate">Dữ liệu học vụ & liên hệ</p>
                 </div>
               </div>
 
@@ -284,8 +267,8 @@ export const RegisterPage: React.FC = () => {
                   <span className="text-[10px] font-bold text-outline uppercase tracking-wider">
                     {activeStep === 2 ? 'Bước 2 • Đang thực hiện' : 'Bước 2'}
                   </span>
-                  <p className="text-sm font-bold text-on-surface truncate">Bảo mật & MFA</p>
-                  <p className="text-xs text-on-surface-variant truncate">Xác thực 2 lớp VNU-ID</p>
+                  <p className="text-sm font-bold text-on-surface truncate">Liên hệ & mật khẩu</p>
+                  <p className="text-xs text-on-surface-variant truncate">Thông tin tài khoản SmartDorm</p>
                 </div>
               </div>
 
@@ -351,7 +334,7 @@ export const RegisterPage: React.FC = () => {
                     Lưu ý nhập liệu đối soát hồ sơ
                   </p>
                   <p className="text-xs text-on-surface-variant leading-relaxed">
-                    Sinh viên khóa mới cần chuẩn bị Mã số sinh viên (MSSV) và Số CMND/CCCD khớp với dữ liệu tuyển sinh đã nhập học để được tự động trích xuất thông tin.
+                    Vui lòng nhập thông tin chính xác theo hồ sơ học vụ. Thông tin đăng ký sẽ được đối soát khi tiếp nhận hồ sơ.
                   </p>
                 </div>
               </div>
@@ -367,10 +350,10 @@ export const RegisterPage: React.FC = () => {
                   </span>
                   <div>
                     <h2 className="text-base sm:text-lg font-bold text-on-surface">
-                      Thông tin định danh học vụ
+                      Thông tin học vụ và cá nhân
                     </h2>
                     <p className="text-xs text-on-surface-variant">
-                      Xác thực với Cơ sở Dữ liệu Đào tạo ĐHQG
+                      Khai báo theo hồ sơ đào tạo của sinh viên
                     </p>
                   </div>
                 </div>
@@ -403,49 +386,19 @@ export const RegisterPage: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* MSSV & API Check Button */}
+                  {/* Student ID */}
                   <div className="space-y-1.5">
                     <label className="block text-xs font-bold text-on-surface" htmlFor="student-id">
                       Mã số sinh viên (MSSV) <span className="text-error">*</span>
                     </label>
-                    <div className="flex gap-2">
-                      <div className="relative flex-1">
-                        <input
-                          id="student-id"
-                          type="text"
-                          value={studentId}
-                          onChange={(e) => setStudentId(e.target.value)}
-                          placeholder="Ví dụ: 24120892"
-                          className="w-full h-11 px-3.5 bg-surface-container-low rounded-xl font-mono text-xs sm:text-sm text-on-surface focus:outline-none focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary border border-outline-variant/30 font-semibold"
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        onClick={handleCheckStudent}
-                        disabled={checkingStudent}
-                        className="px-4 h-11 rounded-xl bg-surface-variant hover:bg-surface-dim text-primary text-xs font-bold flex items-center gap-1.5 transition-colors shrink-0 shadow-xs"
-                      >
-                        {checkingStudent ? (
-                          <>
-                            <span className="material-symbols-outlined text-[18px] animate-spin">
-                              refresh
-                            </span>
-                            <span>Đang đối soát...</span>
-                          </>
-                        ) : (
-                          <>
-                            <span className="material-symbols-outlined text-[18px]">verified</span>
-                            <span>Kiểm tra dữ liệu</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
-                    {studentVerified && (
-                      <p className="text-[11px] text-emerald-600 flex items-center gap-1 font-semibold mt-1">
-                        <span className="material-symbols-outlined text-[15px]">check_circle</span>
-                        <span>Dữ liệu hợp lệ: Đã tìm thấy hồ sơ tuyển sinh K24</span>
-                      </p>
-                    )}
+                    <input
+                      id="student-id"
+                      type="text"
+                      value={studentId}
+                      onChange={(e) => setStudentId(e.target.value)}
+                      placeholder="Ví dụ: 24120892"
+                      className="w-full h-11 px-3.5 bg-surface-container-low rounded-xl font-mono text-xs sm:text-sm text-on-surface focus:outline-none focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary border border-outline-variant/30 font-semibold"
+                    />
                   </div>
 
                   {/* CCCD / Hộ chiếu */}
@@ -464,22 +417,18 @@ export const RegisterPage: React.FC = () => {
                     <p className="text-[11px] text-on-surface-variant">Khớp với giấy báo trúng tuyển đại học</p>
                   </div>
 
-                  {/* Họ và tên (Auto-sync) */}
+                  {/* Student name */}
                   <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-bold text-on-surface" htmlFor="full-name">
-                        Họ và tên sinh viên <span className="text-error">*</span>
-                      </label>
-                      <span className="text-[11px] text-secondary flex items-center gap-1 font-semibold">
-                        <span className="material-symbols-outlined text-[13px]">lock_reset</span> Đồng bộ tự động
-                      </span>
-                    </div>
+                    <label className="block text-xs font-bold text-on-surface" htmlFor="full-name">
+                      Họ và tên sinh viên <span className="text-error">*</span>
+                    </label>
                     <input
                       id="full-name"
                       type="text"
-                      readOnly
                       value={fullName}
-                      className="w-full h-11 px-3.5 bg-surface-container font-bold text-sm text-on-surface rounded-xl cursor-not-allowed uppercase border border-outline-variant/30"
+                      onChange={(e) => setFullName(e.target.value)}
+                      placeholder="Nhập họ và tên"
+                      className="w-full h-11 px-3.5 bg-surface-container-low font-bold text-sm text-on-surface rounded-xl border border-outline-variant/30 focus:outline-none focus:ring-2 focus:ring-primary"
                     />
                   </div>
 
@@ -539,10 +488,10 @@ export const RegisterPage: React.FC = () => {
                   </span>
                   <div>
                     <h2 className="text-base sm:text-lg font-bold text-on-surface">
-                      Thông tin liên hệ & Thiết lập tài khoản SmartDorm
+                      Thông tin liên hệ & mật khẩu
                     </h2>
                     <p className="text-xs text-on-surface-variant">
-                      Thông tin nhận mã định danh và đăng nhập quản lý phòng
+                      Thông tin dùng cho tài khoản và liên hệ hồ sơ
                     </p>
                   </div>
                 </div>
@@ -566,64 +515,30 @@ export const RegisterPage: React.FC = () => {
                         mail
                       </span>
                     </div>
-                    <p className="text-[11px] text-on-surface-variant">Hệ thống gửi thư xác thực vào hòm thư này</p>
+                    <p className="text-[11px] text-on-surface-variant">Dùng cho tài khoản và thông báo về hồ sơ đăng ký</p>
                   </div>
 
-                  {/* Phone number & OTP */}
+                  {/* Phone number */}
                   <div className="space-y-1.5">
                     <label className="block text-xs font-bold text-on-surface" htmlFor="student-phone">
-                      Số điện thoại di động nhận OTP <span className="text-error">*</span>
+                      Số điện thoại di động <span className="text-error">*</span>
                     </label>
-                    <div className="flex gap-2">
-                      <div className="relative flex-1">
-                        <input
-                          id="student-phone"
-                          type="tel"
-                          value={phone}
-                          onChange={(e) => setPhone(e.target.value)}
-                          placeholder="09xx xxx xxx"
-                          className="w-full h-11 px-3.5 pl-9 bg-surface-container-low rounded-xl font-mono text-xs sm:text-sm text-on-surface focus:outline-none focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary border border-outline-variant/30"
-                        />
-                        <span className="material-symbols-outlined absolute left-2.5 top-3 text-on-surface-variant text-[18px]">
-                          phone_iphone
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={handleSendOtp}
-                        disabled={otpRunning && otpCount > 0}
-                        className={`px-3.5 h-11 rounded-xl text-xs font-bold transition-colors shrink-0 shadow-xs ${
-                          otpRunning && otpCount > 0
-                            ? 'bg-primary-fixed text-primary cursor-not-allowed opacity-80'
-                            : 'bg-primary text-white hover:bg-on-primary-fixed-variant'
-                        }`}
-                      >
-                        {otpRunning && otpCount > 0 ? `Gửi lại (${otpCount}s)` : 'Gửi mã OTP'}
-                      </button>
+                    <div className="relative">
+                      <input
+                        id="student-phone"
+                        type="tel"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        placeholder="09xx xxx xxx"
+                        className="w-full h-11 px-3.5 pl-9 bg-surface-container-low rounded-xl font-mono text-xs sm:text-sm text-on-surface focus:outline-none focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary border border-outline-variant/30"
+                      />
+                      <span className="material-symbols-outlined absolute left-2.5 top-3 text-on-surface-variant text-[18px]">
+                        phone_iphone
+                      </span>
                     </div>
                     <p className="text-[11px] text-on-surface-variant">
-                      Dùng để kích hoạt phòng và thông báo cúp điện/nước
+                      Dùng để liên hệ khi cần bổ sung hoặc xác nhận hồ sơ
                     </p>
-                  </div>
-
-                  {/* OTP Input Matrix */}
-                  <div className="space-y-1.5 md:col-span-2">
-                    <label className="block text-xs font-bold text-on-surface">
-                      Nhập mã xác thực OTP 6 chữ số <span className="text-error">*</span>
-                    </label>
-                    <div className="flex items-center gap-2 sm:gap-3 max-w-sm">
-                      {otpDigits.map((digit, idx) => (
-                        <input
-                          key={idx}
-                          id={`otp-input-${idx}`}
-                          type="text"
-                          maxLength={1}
-                          value={digit}
-                          onChange={(e) => handleOtpChange(idx, e.target.value)}
-                          className="w-11 sm:w-12 h-12 text-center text-lg sm:text-xl font-bold bg-surface-container-low rounded-xl text-primary focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary focus:outline-none border border-outline-variant/30 shadow-xs"
-                        />
-                      ))}
-                    </div>
                   </div>
 
                   {/* Password Field */}
@@ -655,13 +570,17 @@ export const RegisterPage: React.FC = () => {
                     <div className="space-y-1 pt-1">
                       <div className="flex items-center justify-between text-[11px]">
                         <span className="text-on-surface-variant">Độ bảo mật:</span>
-                        <span className="text-secondary font-bold">Rất mạnh (Khuyên dùng)</span>
+                        <span className="text-secondary font-bold">
+                          {['Chưa đủ', 'Yếu', 'Trung bình', 'Tốt', 'Rất mạnh'][passwordStrength]}
+                        </span>
                       </div>
                       <div className="w-full bg-surface-container h-1.5 rounded-full overflow-hidden flex gap-1">
-                        <div className="h-full w-1/4 bg-emerald-500 rounded-full" />
-                        <div className="h-full w-1/4 bg-emerald-500 rounded-full" />
-                        <div className="h-full w-1/4 bg-emerald-500 rounded-full" />
-                        <div className="h-full w-1/4 bg-emerald-500 rounded-full" />
+                        {Array.from({ length: 4 }, (_, index) => (
+                          <div
+                            key={index}
+                            className={`h-full w-1/4 rounded-full ${index < passwordStrength ? 'bg-emerald-500' : 'bg-surface-container'}`}
+                          />
+                        ))}
                       </div>
                       <p className="text-[10px] text-on-surface-variant">
                         Tối thiểu 8 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt.

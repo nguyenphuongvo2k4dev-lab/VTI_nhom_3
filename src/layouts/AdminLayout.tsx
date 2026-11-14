@@ -41,8 +41,7 @@ export const AdminLayout: React.FC = () => {
     securityAlerts,
     blockIp,
     toggleLock,
-    loadAllData,
-    setRole
+    loadAllData
   } = useStore();
 
   const pathToAdminId = (path: string): MicroAppId => {

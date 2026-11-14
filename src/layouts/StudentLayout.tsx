@@ -30,8 +30,11 @@ export const StudentLayout: React.FC = () => {
     leaveOpen,
     setLeaveOpen,
     loadAllData,
-    setRole
+    logout,
+    studentBills,
+    selectedBillId
   } = useStore();
+  const selectedBill = studentBills.find((bill) => bill.id === selectedBillId);
 
   // Map route to sidebar item
   const pathToNavId = (path: string): any => {
@@ -71,10 +74,6 @@ export const StudentLayout: React.FC = () => {
         }}
         mobileOpen={mobileMenuOpen}
         onCloseMobile={() => setMobileMenuOpen(false)}
-        onSwitchPortal={() => {
-          setRole('admin');
-          navigate('/admin/overview');
-        }}
         onOpenRules={() => setRulesOpen(true)}
       />
 
@@ -82,9 +81,9 @@ export const StudentLayout: React.FC = () => {
       <StudentHeader
         onToggleMobileMenu={() => setMobileMenuOpen(!mobileMenuOpen)}
         onOpenNotifications={() => navigate('/student/notifications')}
-        onSwitchPortal={() => {
-          setRole('admin');
-          navigate('/admin/overview');
+        onLogout={() => {
+          logout();
+          navigate('/login');
         }}
       />
 
@@ -113,6 +112,9 @@ export const StudentLayout: React.FC = () => {
         isOpen={paymentOpen}
         onClose={() => setPaymentOpen(false)}
         onPaymentSuccess={loadAllData}
+        billId={selectedBill?.id}
+        billAmount={selectedBill?.amount}
+        billMonth={selectedBill?.month}
       />
 
       <StudentRoomRulesModal

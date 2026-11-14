@@ -14,8 +14,10 @@ export type UserRole = 'student' | 'manager' | 'technician' | 'admin';
 
 interface StoreState {
   // Auth & Session
+  isAuthReady: boolean;
   isAuthenticated: boolean;
   currentRole: UserRole;
+  currentStudentId: string | null;
   userName: string;
   userEmail: string;
   lang: 'VIE' | 'ENG';
@@ -40,6 +42,7 @@ interface StoreState {
   quickConfigOpen: boolean;
   ticketModalOpen: boolean;
   selectedAuditLog: AuditLog | null;
+  selectedBillId: string | null;
 
   // Mobile navigation drawer
   mobileMenuOpen: boolean;
@@ -52,11 +55,18 @@ interface StoreState {
   studentInfo: StudentInfo;
   studentBills: StudentBill[];
   studentTickets: StudentTicket[];
+  studentRoomRequests: Awaited<ReturnType<typeof api.getStudentRoomRequests>>;
+  managedRooms: Awaited<ReturnType<typeof api.getManagerRooms>>;
+  technicians: Awaited<ReturnType<typeof api.getManagerTechnicians>>;
+  managedStudents: Array<Record<string, unknown>>;
+  roomRequests: Awaited<ReturnType<typeof api.getManagerRoomRequests>>;
+  managedTickets: StudentTicket[];
+  technicianTickets: StudentTicket[];
 
   // Actions
-  login: (role: UserRole, identifier?: string) => void;
+  login: (role: UserRole, account?: { studentId: string; fullName: string; email: string }) => void;
+  restoreSession: () => Promise<void>;
   logout: () => void;
-  setRole: (role: UserRole) => void;
   setLang: (lang: 'VIE' | 'ENG') => void;
   showToast: (msg: string) => void;
   hideToast: () => void;
@@ -75,6 +85,7 @@ interface StoreState {
   setQuickConfigOpen: (open: boolean) => void;
   setTicketModalOpen: (open: boolean) => void;
   setSelectedAuditLog: (log: AuditLog | null) => void;
+  setSelectedBillId: (id: string | null) => void;
   setTariffs: (tariffs: TariffItem[]) => void;
 
   // Async data actions
@@ -82,15 +93,19 @@ interface StoreState {
   toggleLock: (logId: string) => Promise<void>;
   blockIp: (alertId: string, ip: string) => Promise<void>;
   payStudentBill: (billId: string, method?: string) => Promise<void>;
+  updateStudentProfile: (profile: Pick<StudentInfo, 'fullName' | 'phone'> & { email: string }) => Promise<void>;
   createStudentTicket: (category: string, description: string) => Promise<void>;
+  createStudentRoomRequest: (type: 'transfer' | 'renewal', detail: string) => Promise<void>;
 }
 
 export const useStore = create<StoreState>((set, get) => ({
   // Defaults
-  isAuthenticated: true,
+  isAuthReady: false,
+  isAuthenticated: false,
   currentRole: 'student',
-  userName: 'Đặng Hoàng Nam',
-  userEmail: 'nam.dh@student.vnu.edu.vn',
+  currentStudentId: null,
+  userName: '',
+  userEmail: '',
   lang: 'VIE',
 
   commandPaletteOpen: false,
@@ -110,95 +125,114 @@ export const useStore = create<StoreState>((set, get) => ({
   quickConfigOpen: false,
   ticketModalOpen: false,
   selectedAuditLog: null,
+  selectedBillId: null,
 
   mobileMenuOpen: false,
 
   stats: {
-    accounts: { total: 4120, newThisWeek: 142, students: 3450, studentsPercent: '83.7%', staff: 48, technicians: 22, admins: 4 },
-    occupancy: { occupied: 3450, totalSlots: 3640, rate: '94.8%', totalRooms: 406, zones: 'Khu A, B, C, D', availableRooms: 21 },
-    infrastructure: { uptime: '99.98%', uptimeDays: 30, cluster: 'Cụm Kubernetes ĐHQG TPHCM', cpuLoad: 18, ramUsed: '6.8 / 16G', ramPercent: 42.5, dbQueries: '420 req/s', apiLatency: '28 ms' },
+    accounts: { total: 0, newThisWeek: 0, students: 0, studentsPercent: '0%', staff: 0, technicians: 0, admins: 0 },
+    occupancy: { occupied: 0, totalSlots: 0, rate: '0%', totalRooms: 0, zones: 'Chưa có dữ liệu', availableRooms: 0 },
+    infrastructure: { uptime: 'Chưa có dữ liệu', uptimeDays: 0, cluster: 'Chưa có dữ liệu', cpuLoad: 0, ramUsed: 'Chưa có dữ liệu', ramPercent: 0, dbQueries: 'Chưa có dữ liệu', apiLatency: 'Chưa có dữ liệu' },
     iot: {
-      electricityMeters: { total: 406, online: 403, percent: '99.2%', disconnectedArea: '3 công tơ mất kết nối (Khu C)' },
-      waterMeters: { total: 406, online: 401, percent: '98.8%', warning: '5 đồng hồ pin yếu (<10%)' },
-      rfidGates: { total: 32, online: 32, percent: '100%', delay: '0 trễ lệch dữ liệu' }
+      electricityMeters: { total: 0, online: 0, percent: '0%', disconnectedArea: 'Chưa có dữ liệu' },
+      waterMeters: { total: 0, online: 0, percent: '0%', warning: 'Chưa có dữ liệu' },
+      rfidGates: { total: 0, online: 0, percent: '0%', delay: 'Chưa có dữ liệu' }
     },
-    cronJobs: [
-      { name: 'Tính cước điện nước IoT (Batch)', progress: 78, note: 'Kỳ tháng 10/2024: 316 / 406 phòng hoàn tất', status: 'Đang chạy' },
-      { name: 'Cổng gửi SMS / Email thông báo', progress: 99.9, note: 'Queue: 14 tin nhắn đang đợi chuyển', status: '99.9% Delivered' },
-      { name: 'Bộ nhớ đệm Redis Cache', progress: 52.5, note: 'Hit rate: 94.2% - Không xảy ra nghẽn I/O', status: '2.1 GB / 4.0 GB' }
-    ]
+    cronJobs: []
   },
   auditLogs: [],
   tariffs: [],
   securityAlerts: [],
 
   studentInfo: {
-    fullName: 'Đặng Hoàng Nam',
-    studentId: '22120045',
-    faculty: 'Khoa CNTT & Truyền thông',
-    className: 'CNTT-K22A',
-    cohort: 'K22',
-    phone: '0912 345 678',
-    room: 'P.402 - Nhà B2 (Khu B)',
-    roomNumber: '402',
-    building: 'B2',
-    zone: 'Khu B (Nam sinh viên)',
-    bedSlot: 'G1',
-    isLeader: true,
+    fullName: '',
+    studentId: '',
+    faculty: '',
+    className: '',
+    cohort: '',
+    phone: '',
+    room: 'Chưa có dữ liệu',
+    roomNumber: '-',
+    building: '-',
+    zone: 'Chưa có dữ liệu',
+    bedSlot: '-',
+    isLeader: false,
     contract: {
-      id: 'HD-2024-8841',
-      daysLeft: 74,
-      expiryDate: '31/12/2024',
-      renewalStartDate: '01/12/2024'
+      id: 'Chưa có dữ liệu',
+      daysLeft: 0,
+      expiryDate: '',
+      renewalStartDate: ''
     },
-    roommates: [
-      { id: '1', bed: 'G1', name: 'Đặng Hoàng Nam', role: 'Bạn • Trưởng phòng', faculty: 'Khoa CNTT & Truyền thông • K22', phone: '0912 345 678', inRoom: true, isMe: true },
-      { id: '2', bed: 'G2', name: 'Nguyễn Tiến Đạt', role: 'Sinh viên', faculty: 'Khoa Điện tử Viễn thông • K22', phone: '0984 112 334', inRoom: true },
-      { id: '3', bed: 'G3', name: 'Lê Bảo Minh', role: 'Sinh viên', faculty: 'Khoa Kinh tế Đối ngoại • K23', phone: '0905 889 211', inRoom: true },
-      { id: '4', bed: 'G4', name: 'Phạm Tuấn Hưng', role: 'Tân sinh viên', faculty: 'Khoa Khoa học Máy tính • K24', phone: '0977 441 902', inRoom: false }
-    ],
+    roommates: [],
     roomSpecs: {
-      airConditioner: '12.000 BTU Inverter',
-      waterHeater: 'Ariston 30L',
-      electricMeter: '1,420 kWh (IoT)',
-      waterMeter: '112 m³ (IoT)'
+      airConditioner: 'Chưa có dữ liệu',
+      waterHeater: 'Chưa có dữ liệu',
+      electricMeter: 'Chưa có dữ liệu',
+      waterMeter: 'Chưa có dữ liệu'
     }
   },
   studentBills: [],
   studentTickets: [],
+  studentRoomRequests: [],
+  managedRooms: [],
+  technicians: [],
+  managedStudents: [],
+  roomRequests: [],
+  managedTickets: [],
+  technicianTickets: [],
 
-  login: (role, identifier) => {
-    let name = 'Đặng Hoàng Nam';
-    let email = 'nam.dh@student.vnu.edu.vn';
-    if (role === 'admin') {
-      name = 'TS. Trần Minh Khoa';
-      email = 'root@dorm.edu.vn';
-    } else if (role === 'manager') {
-      name = 'Nguyễn Văn Hoàng';
-      email = 'hoang.nv@dorm.edu.vn';
-    } else if (role === 'technician') {
-      name = 'Nguyễn Văn Hùng';
-      email = 'hung.nv@tech.dorm.edu.vn';
-    } else if (identifier) {
-      name = identifier.includes('@') ? identifier.split('@')[0] : identifier;
-    }
-
+  login: (role, account) => {
     set({
       isAuthenticated: true,
+      isAuthReady: true,
       currentRole: role,
-      userName: name,
-      userEmail: email
+      currentStudentId: role === 'student' ? account?.studentId || null : null,
+      userName: account?.fullName || '',
+      userEmail: account?.email || ''
     });
     get().showToast(`Đăng nhập thành công với vai trò ${role.toUpperCase()}!`);
   },
 
-  logout: () => {
-    set({ isAuthenticated: false });
-    get().showToast('Đã đăng xuất khỏi hệ thống SmartDorm.');
+  restoreSession: async () => {
+    try {
+      const account = await api.getSession();
+      if (!account) {
+        if (!get().isAuthenticated) set({ isAuthenticated: false });
+        return;
+      }
+      if (get().isAuthenticated) return;
+      set({
+        isAuthenticated: true,
+        currentRole: account.role,
+        currentStudentId: account.role === 'student' ? account.studentId : null,
+        userName: account.fullName,
+        userEmail: account.email
+      });
+      await get().loadAllData();
+    } catch (error) {
+      console.error('Session restore failed', error);
+      if (!get().isAuthenticated) {
+        set({ isAuthenticated: false });
+        get().showToast(error instanceof Error ? error.message : 'Không thể khôi phục phiên đăng nhập.');
+      }
+    } finally {
+      set({ isAuthReady: true });
+    }
   },
 
-  setRole: (role) => {
-    set({ currentRole: role });
+  logout: () => {
+    void api.logout().catch((error: unknown) => {
+      console.error('Logout request failed', error);
+    });
+    set({
+      isAuthenticated: false,
+      isAuthReady: true,
+      currentRole: 'student',
+      currentStudentId: null,
+      userName: '',
+      userEmail: ''
+    });
+    get().showToast('Đã đăng xuất khỏi hệ thống SmartDorm.');
   },
 
   setLang: (lang) => {
@@ -231,18 +265,29 @@ export const useStore = create<StoreState>((set, get) => ({
   setQuickConfigOpen: (open) => set({ quickConfigOpen: open }),
   setTicketModalOpen: (open) => set({ ticketModalOpen: open }),
   setSelectedAuditLog: (log) => set({ selectedAuditLog: log }),
+  setSelectedBillId: (id) => set({ selectedBillId: id }),
   setTariffs: (tariffs) => set({ tariffs }),
 
   loadAllData: async () => {
+    const role = get().currentRole;
+    if (!get().isAuthenticated) return;
     try {
-      const [s, l, t, a, sInfo, sBills, sTickets] = await Promise.all([
-        api.getStats(),
-        api.getAuditLogs(),
-        api.getTariffs(),
-        api.getSecurityAlerts(),
-        api.getStudentInfo(),
-        api.getStudentBills(),
-        api.getStudentTickets()
+      const studentId = get().currentStudentId;
+      const [s, l, t, a, sInfo, sBills, sTickets, studentRequests, rooms, technicians, students, requests, managerTickets, techTickets] = await Promise.all([
+        role === 'admin' || role === 'manager' ? api.getStats() : Promise.resolve(get().stats),
+        role === 'admin' ? api.getAuditLogs() : Promise.resolve({ total: 0, displayCount: 0, items: get().auditLogs }),
+        role === 'admin' || role === 'manager' ? api.getTariffs() : Promise.resolve(get().tariffs),
+        role === 'admin' ? api.getSecurityAlerts() : Promise.resolve(get().securityAlerts),
+        role === 'student' && studentId ? api.getStudentInfo() : Promise.resolve(get().studentInfo),
+        role === 'student' && studentId ? api.getStudentBills() : Promise.resolve(get().studentBills),
+        role === 'student' && studentId ? api.getStudentTickets() : Promise.resolve(get().studentTickets),
+        role === 'student' && studentId ? api.getStudentRoomRequests() : Promise.resolve(get().studentRoomRequests),
+        role === 'admin' || role === 'manager' ? api.getManagerRooms() : Promise.resolve(get().managedRooms),
+        role === 'admin' || role === 'manager' ? api.getManagerTechnicians() : Promise.resolve(get().technicians),
+        role === 'admin' || role === 'manager' ? api.getManagerStudents() : Promise.resolve({ items: get().managedStudents }),
+        role === 'admin' || role === 'manager' ? api.getManagerRoomRequests() : Promise.resolve(get().roomRequests),
+        role === 'admin' || role === 'manager' ? api.getManagerTickets() : Promise.resolve(get().managedTickets),
+        role === 'admin' || role === 'technician' ? api.getTechnicianTickets() : Promise.resolve(get().technicianTickets)
       ]);
       set({
         stats: s || get().stats,
@@ -251,10 +296,18 @@ export const useStore = create<StoreState>((set, get) => ({
         securityAlerts: a || get().securityAlerts,
         studentInfo: sInfo || get().studentInfo,
         studentBills: sBills || get().studentBills,
-        studentTickets: sTickets || get().studentTickets
+        studentTickets: sTickets || get().studentTickets,
+        studentRoomRequests: studentRequests || get().studentRoomRequests,
+        managedRooms: rooms || get().managedRooms,
+        technicians: technicians || get().technicians,
+        managedStudents: students.items || get().managedStudents,
+        roomRequests: requests || get().roomRequests,
+        managedTickets: managerTickets || get().managedTickets,
+        technicianTickets: techTickets || get().technicianTickets
       });
     } catch (e) {
-      console.warn('Zustand loadAllData error', e);
+      console.error('Zustand loadAllData error', e);
+      get().showToast('Không tải được dữ liệu từ máy chủ. Vui lòng kiểm tra kết nối MongoDB.');
     }
   },
 
@@ -284,6 +337,16 @@ export const useStore = create<StoreState>((set, get) => ({
     get().showToast(`Thanh toán hóa đơn thành công qua ${method}!`);
   },
 
+  updateStudentProfile: async (profile) => {
+    const updatedProfile = await api.updateStudentProfile(profile);
+    set({
+      studentInfo: updatedProfile,
+      userName: updatedProfile.fullName,
+      userEmail: updatedProfile.email || get().userEmail
+    });
+    get().showToast('Đã lưu thông tin hồ sơ sinh viên.');
+  },
+
   createStudentTicket: async (category: string, description: string) => {
     const res = await api.createStudentTicket(category, description);
     if (res?.ticket) {
@@ -292,5 +355,11 @@ export const useStore = create<StoreState>((set, get) => ({
       }));
     }
     get().showToast('Đã gửi báo hỏng thiết bị tới kỹ thuật viên KTX!');
+  },
+
+  createStudentRoomRequest: async (type, detail) => {
+    await api.createStudentRoomRequest(type, detail);
+    await get().loadAllData();
+    get().showToast('Đã gửi yêu cầu đến Ban Quản lý KTX.');
   }
 }));

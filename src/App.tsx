@@ -37,6 +37,27 @@ import { AuditApp } from './micro-apps/audit/AuditApp';
 import { ReportsApp } from './micro-apps/reports/ReportsApp';
 import { ConfigApp } from './micro-apps/config/ConfigApp';
 import { SecurityApp } from './micro-apps/security/SecurityApp';
+import { ManagerOperations, TechnicianOperations } from './micro-apps/role-operations/RoleOperations';
+
+const roleHome = (role: ReturnType<typeof useStore.getState>['currentRole']) => {
+  if (role === 'admin') return '/admin/overview';
+  if (role === 'manager') return '/manager';
+  if (role === 'technician') return '/technician';
+  return '/student/overview';
+};
+
+const ProtectedRoute: React.FC<{
+  roles: Array<ReturnType<typeof useStore.getState>['currentRole']>;
+  children: React.ReactElement;
+}> = ({ roles, children }) => {
+  const isAuthReady = useStore((state) => state.isAuthReady);
+  const isAuthenticated = useStore((state) => state.isAuthenticated);
+  const currentRole = useStore((state) => state.currentRole);
+  if (!isAuthReady) return null;
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (!roles.includes(currentRole)) return <Navigate to={roleHome(currentRole)} replace />;
+  return children;
+};
 
 // Global Toast Banner
 const GlobalToast: React.FC = () => {
@@ -56,6 +77,7 @@ const GlobalToast: React.FC = () => {
 
 export default function App() {
   const {
+    restoreSession,
     loadAllData,
     stats,
     auditLogs,
@@ -63,10 +85,15 @@ export default function App() {
     securityAlerts,
     setSelectedAuditLog,
     studentInfo,
+    updateStudentProfile,
     studentBills,
     studentTickets,
-    setReportFaultOpen,
+    studentRoomRequests,
+    createStudentRoomRequest,
+    setSelectedBillId,
     setPaymentOpen,
+    setReportFaultOpen,
+    showToast,
     setRulesOpen,
     setMeterOpen,
     setLeaveOpen,
@@ -74,8 +101,18 @@ export default function App() {
   } = useStore();
 
   useEffect(() => {
-    loadAllData();
-  }, [loadAllData]);
+    void restoreSession();
+  }, [restoreSession]);
+
+  const openFirstPendingBill = () => {
+    const bill = studentBills.find((item) => item.status === 'pending');
+    if (!bill) {
+      showToast('Bạn không có hóa đơn nào đang chờ thanh toán.');
+      return;
+    }
+    setSelectedBillId(bill.id);
+    setPaymentOpen(true);
+  };
 
   return (
     <BrowserRouter>
@@ -87,7 +124,7 @@ export default function App() {
         <Route path="/register" element={<RegisterPage />} />
 
         {/* Student Portal Routes (code_e4ce4486.html) */}
-        <Route path="/student" element={<StudentLayout />}>
+        <Route path="/student" element={<ProtectedRoute roles={['student']}><StudentLayout /></ProtectedRoute>}>
           <Route index element={<Navigate to="/student/overview" replace />} />
           <Route
             path="overview"
@@ -97,14 +134,14 @@ export default function App() {
                 bills={studentBills}
                 tickets={studentTickets}
                 onOpenReportFault={() => setReportFaultOpen(true)}
-                onOpenPayBill={() => setPaymentOpen(true)}
+                onOpenPayBill={openFirstPendingBill}
                 onOpenRules={() => setRulesOpen(true)}
                 onOpenMeter={() => setMeterOpen(true)}
                 onOpenLeave={() => setLeaveOpen(true)}
               />
             }
           />
-          <Route path="profile" element={<StudentProfileView info={studentInfo} />} />
+          <Route path="profile" element={<StudentProfileView info={studentInfo} onSave={updateStudentProfile} />} />
           <Route
             path="room"
             element={
@@ -113,21 +150,32 @@ export default function App() {
                 bills={studentBills}
                 tickets={studentTickets}
                 onOpenReportFault={() => setReportFaultOpen(true)}
-                onOpenPayBill={() => setPaymentOpen(true)}
+                onOpenPayBill={openFirstPendingBill}
                 onOpenRules={() => setRulesOpen(true)}
                 onOpenMeter={() => setMeterOpen(true)}
                 onOpenLeave={() => setLeaveOpen(true)}
               />
             }
           />
-          <Route path="transfer" element={<StudentRoomTransferView />} />
+          <Route
+            path="transfer"
+            element={
+              <StudentRoomTransferView
+                requests={studentRoomRequests}
+                onRequestCreated={createStudentRoomRequest}
+              />
+            }
+          />
           <Route path="contract" element={<StudentContractView info={studentInfo} />} />
           <Route
             path="bills"
             element={
               <StudentBillsView
                 bills={studentBills}
-                onOpenPayBill={() => setPaymentOpen(true)}
+                onOpenPayBill={(bill) => {
+                  setSelectedBillId(bill.id);
+                  setPaymentOpen(true);
+                }}
               />
             }
           />
@@ -141,11 +189,11 @@ export default function App() {
             }
           />
           <Route path="notifications" element={<StudentNotificationsView />} />
-          <Route path="history" element={<StudentHistoryView tickets={studentTickets} />} />
+          <Route path="history" element={<StudentHistoryView tickets={studentTickets} requests={studentRoomRequests} />} />
         </Route>
 
         {/* Admin Console Routes (code_c9b2d1a9.html) */}
-        <Route path="/admin" element={<AdminLayout />}>
+        <Route path="/admin" element={<ProtectedRoute roles={['admin']}><AdminLayout /></ProtectedRoute>}>
           <Route index element={<Navigate to="/admin/overview" replace />} />
           <Route
             path="overview"
@@ -182,10 +230,21 @@ export default function App() {
           />
         </Route>
 
-        {/* Default / Fallback: Go to Student Portal by default */}
-        <Route path="/" element={<Navigate to="/student/overview" replace />} />
-        <Route path="*" element={<Navigate to="/student/overview" replace />} />
+        <Route path="/manager" element={<ProtectedRoute roles={['manager', 'admin']}><ManagerOperations /></ProtectedRoute>} />
+        <Route path="/technician" element={<ProtectedRoute roles={['technician', 'admin']}><TechnicianOperations /></ProtectedRoute>} />
+
+        {/* Open the login page when visiting the site root. */}
+        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="*" element={<RoleHomeRedirect />} />
       </Routes>
     </BrowserRouter>
   );
 }
+
+const RoleHomeRedirect: React.FC = () => {
+  const isAuthReady = useStore((state) => state.isAuthReady);
+  const isAuthenticated = useStore((state) => state.isAuthenticated);
+  const currentRole = useStore((state) => state.currentRole);
+  if (!isAuthReady) return null;
+  return <Navigate to={isAuthenticated ? roleHome(currentRole) : '/login'} replace />;
+};

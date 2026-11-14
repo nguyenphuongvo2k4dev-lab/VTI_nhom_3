@@ -1,89 +1,187 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { StudentInfo, StudentBill, StudentTicket } from '../../core/types';
 
-export const StudentProfileView: React.FC<{ info: StudentInfo }> = ({ info }) => (
-  <div className="space-y-6">
-    <div className="border-b border-surface-container-high pb-4">
-      <h2 className="text-xl font-bold text-on-surface">Thông Tin Cá Nhân Sinh Viên</h2>
-      <p className="text-xs text-on-surface-variant">Hồ sơ trích xuất từ Cổng dữ liệu tập trung ĐHQG TP.HCM</p>
-    </div>
+export const StudentProfileView: React.FC<{
+  info: StudentInfo;
+  onSave: (profile: Pick<StudentInfo, 'fullName' | 'phone'> & { email: string }) => Promise<void>;
+}> = ({ info, onSave }) => {
+  const [editing, setEditing] = useState(false);
+  const [fullName, setFullName] = useState(info.fullName);
+  const [email, setEmail] = useState(info.email || '');
+  const [phone, setPhone] = useState(info.phone);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
-    <div className="bg-surface-container-lowest rounded-xl p-6 border border-outline-variant/30 shadow-xs grid grid-cols-1 md:grid-cols-2 gap-6">
-      <div className="space-y-3 text-xs">
+  React.useEffect(() => {
+    setFullName(info.fullName);
+    setEmail(info.email || '');
+    setPhone(info.phone);
+  }, [info.fullName, info.email, info.phone]);
+
+  const saveProfile = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setSaving(true);
+    setError('');
+    try {
+      await onSave({ fullName, email, phone });
+      setEditing(false);
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'Không thể lưu hồ sơ.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-surface-container-high pb-4">
         <div>
-          <span className="text-outline block">Họ và tên</span>
-          <span className="text-sm font-bold text-on-surface">{info.fullName}</span>
+          <h2 className="text-xl font-bold text-on-surface">Thông Tin Cá Nhân Sinh Viên</h2>
+          <p className="text-xs text-on-surface-variant">Cập nhật họ tên, email và số điện thoại liên hệ.</p>
         </div>
-        <div>
-          <span className="text-outline block">Mã số sinh viên (MSSV)</span>
-          <span className="font-mono font-semibold text-primary">{info.studentId}</span>
-        </div>
-        <div>
-          <span className="text-outline block">Khoa / Trường thành viên</span>
-          <span className="font-medium text-on-surface">{info.faculty}</span>
-        </div>
-        <div>
-          <span className="text-outline block">Lớp niên chế</span>
-          <span className="font-medium text-on-surface">{info.className} ({info.cohort})</span>
-        </div>
+        {!editing && (
+          <button onClick={() => setEditing(true)} className="rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-white">
+            Chỉnh sửa hồ sơ
+          </button>
+        )}
       </div>
 
-      <div className="space-y-3 text-xs">
-        <div>
-          <span className="text-outline block">Số điện thoại liên lạc</span>
-          <span className="font-mono font-semibold text-on-surface">{info.phone}</span>
+      <form onSubmit={saveProfile} className="space-y-6 rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-6 shadow-xs">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          <div className="space-y-4">
+            <label className="block text-xs">
+              <span className="mb-1 block text-outline">Họ và tên</span>
+              {editing ? (
+                <input required minLength={2} maxLength={100} value={fullName} onChange={(event) => setFullName(event.target.value)} className="w-full rounded-lg border border-outline-variant/40 bg-surface-container-low px-3 py-2 text-sm" />
+              ) : <span className="text-sm font-bold text-on-surface">{info.fullName}</span>}
+            </label>
+            <div className="text-xs">
+              <span className="block text-outline">Mã số sinh viên (không thể chỉnh sửa)</span>
+              <span className="font-mono font-semibold text-primary">{info.studentId}</span>
+            </div>
+            <div className="text-xs">
+              <span className="block text-outline">Khoa / Trường thành viên</span>
+              <span className="font-medium text-on-surface">{info.faculty}</span>
+            </div>
+            <div className="text-xs">
+              <span className="block text-outline">Lớp niên chế</span>
+              <span className="font-medium text-on-surface">{info.className} ({info.cohort})</span>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <label className="block text-xs">
+              <span className="mb-1 block text-outline">Email</span>
+              {editing ? (
+                <input required type="email" maxLength={254} value={email} onChange={(event) => setEmail(event.target.value)} className="w-full rounded-lg border border-outline-variant/40 bg-surface-container-low px-3 py-2 text-sm" />
+              ) : <span className="font-medium text-on-surface">{info.email || 'Chưa cập nhật'}</span>}
+            </label>
+            <label className="block text-xs">
+              <span className="mb-1 block text-outline">Số điện thoại liên lạc</span>
+              {editing ? (
+                <input required type="tel" maxLength={20} minLength={10} value={phone} onChange={(event) => setPhone(event.target.value)} className="w-full rounded-lg border border-outline-variant/40 bg-surface-container-low px-3 py-2 text-sm" />
+              ) : <span className="font-mono font-semibold text-on-surface">{info.phone}</span>}
+            </label>
+            <div className="text-xs">
+              <span className="block text-outline">Phòng ở hiện tại</span>
+              <span className="font-semibold text-secondary">{info.room}</span>
+            </div>
+            <div className="text-xs">
+              <span className="block text-outline">Vị trí giường</span>
+              <span className="font-bold text-on-surface">{info.bedSlot} ({info.isLeader ? 'Trưởng phòng' : 'Thành viên'})</span>
+            </div>
+          </div>
         </div>
-        <div>
-          <span className="text-outline block">Phòng ở hiện tại</span>
-          <span className="font-semibold text-secondary">{info.room}</span>
-        </div>
-        <div>
-          <span className="text-outline block">Vị trí giường</span>
-          <span className="font-bold text-on-surface">{info.bedSlot} ({info.isLeader ? 'Trưởng phòng' : 'Thành viên'})</span>
-        </div>
-        <div>
-          <span className="text-outline block">Mã định danh RFID KTX</span>
-          <span className="font-mono text-outline">RFID_VNU_B2_402_G1</span>
-        </div>
-      </div>
+
+        {error && <p role="alert" className="text-sm text-error">{error}</p>}
+        {editing && (
+          <div className="flex justify-end gap-2 border-t border-surface-container-high pt-4">
+            <button type="button" onClick={() => { setEditing(false); setError(''); setFullName(info.fullName); setEmail(info.email || ''); setPhone(info.phone); }} className="rounded-lg bg-surface-container px-4 py-2 text-xs font-semibold">
+              Hủy
+            </button>
+            <button disabled={saving} className="rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-white disabled:opacity-50">
+              {saving ? 'Đang lưu...' : 'Lưu thay đổi'}
+            </button>
+          </div>
+        )}
+      </form>
     </div>
-  </div>
-);
+  );
+};
 
-export const StudentRoomTransferView: React.FC = () => (
-  <div className="space-y-6">
-    <div className="border-b border-surface-container-high pb-4">
-      <h2 className="text-xl font-bold text-on-surface">Đăng Ký & Chuyển Phòng KTX</h2>
-      <p className="text-xs text-on-surface-variant">Đơn đăng ký nguyện vọng đổi phòng cho học kỳ kế tiếp</p>
-    </div>
+type StudentRoomRequest = {
+  id: string;
+  type: 'transfer' | 'renewal';
+  detail: string;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: string;
+};
 
-    <div className="bg-surface-container-lowest rounded-xl p-6 border border-outline-variant/30 shadow-xs space-y-4">
-      <div className="p-4 rounded-xl bg-secondary-fixed/40 border border-secondary/30 flex items-start gap-3">
-        <span className="material-symbols-outlined text-secondary text-[24px]">info</span>
-        <div>
-          <h4 className="text-xs font-bold text-on-secondary-fixed">Hồ sơ #DK-24098 đang được xét duyệt</h4>
-          <p className="text-xs text-on-secondary-fixed/90 mt-0.5">
-            Nguyện vọng: <strong>Chuyển sang B402 (Phòng 2 người/Đơn CLC)</strong>. Dự kiến hoàn tất ngày 28/10/2024 bởi Cán bộ Nguyễn Thu Trang.
-          </p>
-        </div>
+export const StudentRoomTransferView: React.FC<{
+  requests: StudentRoomRequest[];
+  onRequestCreated: (type: 'transfer' | 'renewal', detail: string) => Promise<void>;
+}> = ({ requests, onRequestCreated }) => {
+  const [type, setType] = useState<'transfer' | 'renewal'>('transfer');
+  const [detail, setDetail] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  const submitRequest = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setSubmitting(true);
+    setError('');
+    try {
+      await onRequestCreated(type, detail);
+      setDetail('');
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'Không thể gửi yêu cầu.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="border-b border-surface-container-high pb-4">
+        <h2 className="text-xl font-bold text-on-surface">Đăng Ký & Chuyển Phòng KTX</h2>
+        <p className="text-xs text-on-surface-variant">Yêu cầu sẽ được lưu và chuyển đến Ban Quản lý.</p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-        <div className="p-4 rounded-xl bg-surface-container-low border border-surface-container-high">
-          <span className="text-outline block mb-1 font-semibold uppercase">Phòng hiện tại</span>
-          <div className="text-base font-bold text-on-surface">P.402 - Nhà B2</div>
-          <span className="text-on-surface-variant">Phòng 4 SV • 650,000 đ/tháng</span>
-        </div>
+      <form onSubmit={submitRequest} className="space-y-4 rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-6">
+        <label className="block text-xs font-semibold">
+          Loại yêu cầu
+          <select value={type} onChange={(event) => setType(event.target.value as 'transfer' | 'renewal')} className="mt-1 block w-full rounded-lg border border-outline-variant/40 bg-surface-container-low px-3 py-2">
+            <option value="transfer">Chuyển phòng</option>
+            <option value="renewal">Gia hạn hợp đồng</option>
+          </select>
+        </label>
+        <label className="block text-xs font-semibold">
+          Nội dung
+          <textarea value={detail} onChange={(event) => setDetail(event.target.value)} minLength={5} maxLength={1000} required rows={3} className="mt-1 block w-full rounded-lg border border-outline-variant/40 bg-surface-container-low p-3" placeholder={type === 'transfer' ? 'Ghi rõ khu/phòng mong muốn và lý do chuyển.' : 'Ghi rõ thời gian và lý do gia hạn.'} />
+        </label>
+        {error && <p role="alert" className="text-sm text-error">{error}</p>}
+        <button disabled={submitting} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+          {submitting ? 'Đang gửi...' : 'Gửi yêu cầu'}
+        </button>
+      </form>
 
-        <div className="p-4 rounded-xl bg-surface-container-low border border-surface-container-high">
-          <span className="text-outline block mb-1 font-semibold uppercase">Phòng nguyện vọng</span>
-          <div className="text-base font-bold text-primary">P.402 - Nhà B4 (CLC)</div>
-          <span className="text-on-surface-variant">Phòng 2 SV • 1,200,000 đ/tháng</span>
-        </div>
-      </div>
+      <section className="space-y-3">
+        <h3 className="text-lg font-bold">Yêu cầu đã gửi</h3>
+        {requests.length === 0 && <p className="rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-4 text-sm text-on-surface-variant">Bạn chưa gửi yêu cầu nào.</p>}
+        {requests.map((request) => (
+          <article key={request.id} className="rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-4">
+            <div className="flex flex-wrap justify-between gap-2">
+              <strong>#{request.id} · {request.type === 'transfer' ? 'Chuyển phòng' : 'Gia hạn'}</strong>
+              <span className="text-xs">{request.status === 'pending' ? 'Chờ duyệt' : request.status === 'approved' ? 'Đã duyệt' : 'Từ chối'}</span>
+            </div>
+            <p className="mt-2 text-sm text-on-surface-variant">{request.detail}</p>
+            <time className="mt-2 block text-xs text-outline">{new Date(request.createdAt).toLocaleString('vi-VN')}</time>
+          </article>
+        ))}
+      </section>
     </div>
-  </div>
-);
+  );
+};
 
 export const StudentContractView: React.FC<{ info: StudentInfo }> = ({ info }) => (
   <div className="space-y-6">
@@ -131,8 +229,12 @@ export const StudentContractView: React.FC<{ info: StudentInfo }> = ({ info }) =
 
 export const StudentBillsView: React.FC<{
   bills: StudentBill[];
-  onOpenPayBill: () => void;
-}> = ({ bills, onOpenPayBill }) => (
+  onOpenPayBill: (bill: StudentBill) => void;
+}> = ({ bills, onOpenPayBill }) => {
+  const pendingBills = bills.filter((bill) => bill.status === 'pending');
+  const currentBill = pendingBills[0];
+
+  return (
   <div className="space-y-6">
     <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-surface-container-high gap-3">
       <div>
@@ -140,10 +242,11 @@ export const StudentBillsView: React.FC<{
         <p className="text-xs text-on-surface-variant">Lịch sử thu phí phòng, điện nước và dịch vụ nội trú</p>
       </div>
       <button
-        onClick={onOpenPayBill}
+        onClick={() => currentBill && onOpenPayBill(currentBill)}
+        disabled={!currentBill}
         className="px-4 py-2 rounded-lg bg-primary text-white text-xs font-semibold hover:bg-primary-container shadow-sm transition-all"
       >
-        Thanh toán kỳ này (685,000 đ)
+        {currentBill ? `Thanh toán ${currentBill.month} (${currentBill.amount.toLocaleString('vi-VN')} đ)` : 'Không có hóa đơn chờ thanh toán'}
       </button>
     </div>
 
@@ -179,7 +282,7 @@ export const StudentBillsView: React.FC<{
                 <td className="py-3.5 px-4 text-right whitespace-nowrap">
                   {bill.status === 'pending' ? (
                     <button
-                      onClick={onOpenPayBill}
+                      onClick={() => onOpenPayBill(bill)}
                       className="px-3 py-1.5 rounded-lg bg-primary text-white text-xs font-semibold shadow-xs hover:bg-primary-container"
                     >
                       VNPay / MoMo
@@ -200,7 +303,8 @@ export const StudentBillsView: React.FC<{
       </div>
     </div>
   </div>
-);
+  );
+};
 
 export const StudentFaultsView: React.FC<{
   tickets: StudentTicket[];
@@ -287,7 +391,10 @@ export const StudentNotificationsView: React.FC = () => (
   </div>
 );
 
-export const StudentHistoryView: React.FC<{ tickets: StudentTicket[] }> = ({ tickets }) => (
+export const StudentHistoryView: React.FC<{
+  tickets: StudentTicket[];
+  requests: StudentRoomRequest[];
+}> = ({ tickets, requests }) => (
   <div className="space-y-6">
     <div className="border-b border-surface-container-high pb-4">
       <h2 className="text-xl font-bold text-on-surface">Lịch Sử Yêu Cầu & Đơn Điện Tử</h2>
@@ -306,17 +413,15 @@ export const StudentHistoryView: React.FC<{ tickets: StudentTicket[] }> = ({ tic
           </tr>
         </thead>
         <tbody className="divide-y divide-surface-container-high/40">
-          <tr className="hover:bg-surface-container-low/40">
-            <td className="py-3 px-4 font-mono font-bold text-primary">#DK-24098</td>
-            <td className="py-3 px-4">Đơn chuyển phòng</td>
-            <td className="py-3 px-4">Chuyển sang B402 (Phòng 2 người/Đơn CLC)</td>
-            <td className="py-3 px-4">
-              <span className="px-2 py-0.5 rounded-full bg-secondary-fixed text-on-secondary-fixed text-[10px] font-bold">
-                Chờ duyệt
-              </span>
-            </td>
-            <td className="py-3 px-4 text-right text-outline">22/10/2024</td>
-          </tr>
+          {requests.map((request) => (
+            <tr key={request.id} className="hover:bg-surface-container-low/40">
+              <td className="py-3 px-4 font-mono font-bold text-primary">#{request.id}</td>
+              <td className="py-3 px-4">{request.type === 'transfer' ? 'Đơn chuyển phòng' : 'Đơn gia hạn'}</td>
+              <td className="py-3 px-4">{request.detail}</td>
+              <td className="py-3 px-4">{request.status === 'pending' ? 'Chờ duyệt' : request.status === 'approved' ? 'Đã duyệt' : 'Từ chối'}</td>
+              <td className="py-3 px-4 text-right text-outline">{new Date(request.createdAt).toLocaleDateString('vi-VN')}</td>
+            </tr>
+          ))}
           {tickets.map(t => (
             <tr key={t.id} className="hover:bg-surface-container-low/40">
               <td className="py-3 px-4 font-mono font-bold text-primary">#{t.id}</td>

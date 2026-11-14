@@ -6,6 +6,7 @@ interface StudentPaymentModalProps {
   isOpen: boolean;
   onClose: () => void;
   onPaymentSuccess: () => void;
+  billId?: string;
   billAmount?: number;
   billMonth?: string;
 }
@@ -14,8 +15,9 @@ export const StudentPaymentModal: React.FC<StudentPaymentModalProps> = ({
   isOpen,
   onClose,
   onPaymentSuccess,
-  billAmount = 685000,
-  billMonth = 'Tháng 10/2024'
+  billId,
+  billAmount = 0,
+  billMonth = 'Hóa đơn'
 }) => {
   const [method, setMethod] = useState<'vnpay' | 'momo' | 'napas'>('vnpay');
   const [processing, setProcessing] = useState(false);
@@ -23,9 +25,10 @@ export const StudentPaymentModal: React.FC<StudentPaymentModalProps> = ({
   if (!isOpen) return null;
 
   const handleConfirmPay = async () => {
+    if (!billId) return;
     setProcessing(true);
     try {
-      await api.payBill('BILL-10-2024', method.toUpperCase());
+      await api.payBill(billId, method.toUpperCase());
       onPaymentSuccess();
       eventBus.emit(EVENTS.SHOW_TOAST, `Thanh toán thành công hóa đơn ${billMonth}! Mã chuẩn chi: VNU-PAY-${Date.now().toString().slice(-6)}`);
       onClose();
@@ -47,7 +50,7 @@ export const StudentPaymentModal: React.FC<StudentPaymentModalProps> = ({
             </div>
             <div>
               <h3 className="text-base font-bold text-on-surface">Thanh Toán Hóa Đơn KTX</h3>
-              <p className="text-xs text-outline">{billMonth} • Phòng 402 Nhà B2</p>
+              <p className="text-xs text-outline">{billMonth} · #{billId || 'Chưa chọn hóa đơn'}</p>
             </div>
           </div>
           <button onClick={onClose} className="p-1 rounded-lg hover:bg-surface-container text-on-surface-variant">
@@ -57,24 +60,8 @@ export const StudentPaymentModal: React.FC<StudentPaymentModalProps> = ({
 
         {/* Bill summary breakdown */}
         <div className="bg-surface-container-low p-4 rounded-xl border border-surface-container-high space-y-2 text-xs">
-          <div className="flex justify-between text-on-surface-variant">
-            <span>Tiền phòng tiêu chuẩn:</span>
-            <span className="font-mono font-semibold">650,000 đ</span>
-          </div>
-          <div className="flex justify-between text-on-surface-variant">
-            <span>Điện tiêu thụ (142 kWh):</span>
-            <span className="font-mono font-semibold">278,000 đ</span>
-          </div>
-          <div className="flex justify-between text-on-surface-variant">
-            <span>Nước sinh hoạt (16 m³):</span>
-            <span className="font-mono font-semibold">142,800 đ</span>
-          </div>
-          <div className="flex justify-between text-on-surface-variant">
-            <span>Chia đều 4 bạn cùng phòng:</span>
-            <span className="font-mono text-secondary font-semibold">÷ 4 sinh viên</span>
-          </div>
           <div className="border-t border-surface-container-high pt-2 flex justify-between items-center text-sm font-bold">
-            <span className="text-on-surface">Khoản cần nộp của bạn:</span>
+            <span className="text-on-surface">Số tiền theo hóa đơn:</span>
             <span className="font-mono text-error text-base">{billAmount.toLocaleString('vi-VN')} đ</span>
           </div>
         </div>
@@ -147,7 +134,7 @@ export const StudentPaymentModal: React.FC<StudentPaymentModalProps> = ({
           <button
             type="button"
             onClick={handleConfirmPay}
-            disabled={processing}
+            disabled={processing || !billId}
             className="px-5 py-2 rounded-lg bg-primary text-on-primary text-xs font-semibold hover:bg-primary-container shadow-sm transition-all flex items-center gap-1.5"
           >
             {processing && <span className="material-symbols-outlined text-[16px] animate-spin">sync</span>}

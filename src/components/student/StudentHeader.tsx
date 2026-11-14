@@ -1,17 +1,20 @@
 import React, { useState } from 'react';
-import { PortalMode } from '../../core/types';
+import { useStore } from '../../store/useStore';
 
 interface StudentHeaderProps {
   onToggleMobileMenu: () => void;
   onOpenNotifications: () => void;
-  onSwitchPortal?: (mode: PortalMode) => void;
+  onLogout: () => void;
 }
 
 export const StudentHeader: React.FC<StudentHeaderProps> = ({
   onToggleMobileMenu,
   onOpenNotifications,
+  onLogout
 }) => {
   const [profileDropdown, setProfileDropdown] = useState(false);
+  const { userName, currentStudentId, studentInfo } = useStore();
+  const initials = userName.split(/\s+/).slice(-2).map((part) => part[0]).join('').toUpperCase();
 
   return (
     <header className="fixed top-0 left-0 lg:left-72 right-0 h-16 bg-surface-container-lowest/90 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-40 px-4 sm:px-8 flex items-center justify-between gap-4 border-b border-outline-variant/30">
@@ -65,14 +68,14 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
             className="flex items-center gap-2.5 pl-2 sm:pl-3 border-l border-outline-variant/40 cursor-pointer select-none group"
           >
             <div className="flex flex-col text-right hidden sm:flex">
-              <span className="text-xs font-bold text-on-surface">Đặng Hoàng Nam</span>
+              <span className="text-xs font-bold text-on-surface">{userName}</span>
               <span className="text-[11px] text-on-surface-variant">
-                MSSV: 22120045 • Khu Nhà B - P.402
+                MSSV: {currentStudentId} • {studentInfo.room}
               </span>
             </div>
 
             <div className="w-9 h-9 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-xs ring-2 ring-primary/20 shrink-0">
-              HN
+              {initials}
             </div>
             <span className="material-symbols-outlined text-outline text-[18px]">expand_more</span>
           </div>
@@ -81,10 +84,10 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
           {profileDropdown && (
             <div className="absolute right-0 top-full mt-2 w-56 py-1.5 bg-surface-container-lowest rounded-xl shadow-xl border border-outline-variant/30 z-50">
               <div className="px-4 py-2 border-b border-surface-container-high">
-                <p className="text-xs font-bold text-on-surface">Đặng Hoàng Nam</p>
-                <p className="text-[11px] text-outline font-mono">MSSV: 22120045</p>
+                <p className="text-xs font-bold text-on-surface">{userName}</p>
+                <p className="text-[11px] text-outline font-mono">MSSV: {currentStudentId}</p>
                 <span className="inline-block mt-1 text-[10px] px-2 py-0.5 rounded-full bg-primary-fixed text-primary font-bold">
-                  Phòng 402 - Tòa B2 (Trưởng phòng)
+                  {studentInfo.room} {studentInfo.isLeader ? '• Trưởng phòng' : ''}
                 </span>
               </div>
 
@@ -113,7 +116,7 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
               <button
                 onClick={() => {
                   setProfileDropdown(false);
-                  window.location.href = '/login';
+                  onLogout();
                 }}
                 className="w-full text-left px-4 py-2 text-xs font-semibold text-error hover:bg-error-container/40 flex items-center gap-2"
               >

@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useStore } from '../store/useStore';
+import { api } from '../core/api';
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
-  const { login, lang, setLang } = useStore();
+  const { login, lang, setLang, showToast, loadAllData } = useStore();
 
   const [authTab, setAuthTab] = useState<'form' | 'qr'>('form');
   const [identifier, setIdentifier] = useState('22120045');
@@ -13,28 +14,44 @@ export const LoginPage: React.FC = () => {
   const [rememberMe, setRememberMe] = useState(true);
   const [loading, setLoading] = useState(false);
 
-  const handleLoginSubmit = (e?: React.FormEvent) => {
+  const handleLoginSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!identifier || !password) {
-      alert('Vui lòng nhập đầy đủ thông tin tài khoản và mật khẩu.');
+      showToast('Vui lòng nhập đầy đủ thông tin tài khoản và mật khẩu.');
       return;
     }
 
     setLoading(true);
-    setTimeout(() => {
-      login('student', identifier);
+    try {
+      const account = await api.login(identifier, password);
+      login(account.role, account);
+      await loadAllData();
       setLoading(false);
-      navigate('/student/overview');
-    }, 600);
+      navigate(account.role === 'student'
+        ? '/student/overview'
+        : account.role === 'manager'
+          ? '/manager'
+          : account.role === 'technician'
+            ? '/technician'
+            : '/admin/overview');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Không thể đăng nhập. Vui lòng thử lại.');
+      setLoading(false);
+    }
   };
 
-  const handleVnuSso = () => {
+  const handleVnuSso = async () => {
     setLoading(true);
-    setTimeout(() => {
-      login('student', 'sso.user@vnu.edu.vn');
+    try {
+      const account = await api.login('22120045', 'smartdorm@2024');
+      login('student', account);
+      await loadAllData();
       setLoading(false);
       navigate('/student/overview');
-    }, 600);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Không thể đăng nhập bằng VNU SSO.');
+      setLoading(false);
+    }
   };
 
   return (

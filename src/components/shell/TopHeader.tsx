@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { eventBus, EVENTS } from '../../core/bus';
+import { useNavigate } from 'react-router-dom';
+import { useStore } from '../../store/useStore';
 
 interface TopHeaderProps {
   onToggleMobileMenu: () => void;
@@ -15,6 +17,8 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   notificationCount
 }) => {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const navigate = useNavigate();
+  const logout = useStore((state) => state.logout);
 
   return (
     <header className="fixed top-0 left-0 lg:left-72 right-0 h-16 bg-surface-container-lowest/95 backdrop-blur-md z-30 shadow-[0_1px_8px_rgba(0,0,0,0.04)] border-b border-outline-variant/30">
@@ -183,7 +187,8 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
                   <button
                     onClick={() => {
                       setShowProfileMenu(false);
-                      window.location.href = '/login';
+                      logout();
+                      navigate('/login');
                     }}
                     className="w-full text-left px-4 py-2 hover:bg-error-container/40 text-error flex items-center gap-2 text-xs font-semibold"
                   >

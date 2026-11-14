@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { eventBus, EVENTS } from '../../core/bus';
+import { api } from '../../core/api';
 
 interface UserAccount {
   id: string;
@@ -12,21 +13,25 @@ interface UserAccount {
   lastActive: string;
 }
 
-const INITIAL_ACCOUNTS: UserAccount[] = [
-  { id: 'SV_2411089', fullName: 'Trần Minh Anh', email: 'anh.tm@student.edu.vn', role: 'Sinh viên', room: 'B204', zone: 'Khu B', status: 'active', lastActive: '10 phút trước' },
-  { id: 'SV_2310452', fullName: 'Lê Hoàng Long', email: 'long.lh@student.edu.vn', role: 'Sinh viên', room: 'A102', zone: 'Khu A', status: 'active', lastActive: '35 phút trước' },
-  { id: 'CB_09124', fullName: 'Nguyễn Văn Hoàng', email: 'hoang.nv@dorm.edu.vn', role: 'Cán bộ QL Khu B', room: 'VP Khu B', zone: 'Khu B', status: 'active', lastActive: '5 phút trước' },
-  { id: 'SV_2112450', fullName: 'Phạm Đức Huy', email: 'huy.pd@student.edu.vn', role: 'Sinh viên', room: 'C104', zone: 'Khu C', status: 'suspended', lastActive: '8:05:40 24/10' },
-  { id: 'CB_04412', fullName: 'Lê Hồng Phúc', email: 'phuc.lh@dorm.edu.vn', role: 'Kế toán KTX', room: 'Phòng Tài vụ', zone: 'Khu A', status: 'active', lastActive: 'Vừa xong' },
-  { id: 'KTV_012', fullName: 'Nguyễn Văn Hùng', email: 'hung.nv@tech.dorm.edu.vn', role: 'Kỹ thuật viên Điện Nước', room: 'Tổ Kỹ thuật', zone: 'Toàn KTX', status: 'active', lastActive: '1 giờ trước' },
-  { id: 'ROOT_001', fullName: 'TS. Trần Minh Khoa', email: 'root@dorm.edu.vn', role: 'Super Admin', room: 'BQL Trung tâm', zone: 'ĐHQG', status: 'active', lastActive: 'Đang online' }
-];
-
 export const AccountsApp: React.FC = () => {
-  const [accounts, setAccounts] = useState<UserAccount[]>(INITIAL_ACCOUNTS);
+  const [accounts, setAccounts] = useState<UserAccount[]>([]);
+  const [loadError, setLoadError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [zoneFilter, setZoneFilter] = useState('all');
+
+  const loadAccounts = async () => {
+    try {
+      setAccounts(await api.getUsers());
+      setLoadError('');
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : 'Không tải được danh sách tài khoản.');
+    }
+  };
+
+  useEffect(() => {
+    void loadAccounts();
+  }, []);
 
   const filtered = accounts.filter(acc => {
     if (roleFilter !== 'all' && !acc.role.toLowerCase().includes(roleFilter.toLowerCase())) return false;
@@ -38,15 +43,17 @@ export const AccountsApp: React.FC = () => {
     return true;
   });
 
-  const toggleStatus = (id: string) => {
-    setAccounts(prev => prev.map(a => {
-      if (a.id === id) {
-        const newStatus = a.status === 'active' ? 'suspended' : 'active';
-        eventBus.emit(EVENTS.SHOW_TOAST, `Đã cập nhật trạng thái tài khoản ${a.id}`);
-        return { ...a, status: newStatus };
-      }
-      return a;
-    }));
+  const toggleStatus = async (id: string) => {
+    const account = accounts.find((item) => item.id === id);
+    if (!account) return;
+    const status = account.status === 'active' ? 'suspended' : 'active';
+    try {
+      await api.setUserStatus(id, status);
+      setAccounts((previous) => previous.map((item) => item.id === id ? { ...item, status } : item));
+      eventBus.emit(EVENTS.SHOW_TOAST, `Đã cập nhật trạng thái tài khoản ${id}`);
+    } catch (error) {
+      eventBus.emit(EVENTS.SHOW_TOAST, error instanceof Error ? error.message : 'Không thể cập nhật tài khoản.');
+    }
   };
 
   return (
@@ -97,6 +104,7 @@ export const AccountsApp: React.FC = () => {
 
       {/* Filter and Table Card */}
       <div className="bg-surface-container-lowest rounded-xl border border-outline-variant/30 shadow-xs overflow-hidden">
+        {loadError && <div className="p-4 text-sm text-error">{loadError}</div>}
         <div className="p-4 border-b border-surface-container-high flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2 flex-1 max-w-sm">
             <span className="material-symbols-outlined text-outline text-[18px]">search</span>

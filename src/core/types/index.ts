@@ -25,6 +25,7 @@ export interface Roommate {
 export interface StudentInfo {
   fullName: string;
   studentId: string;
+  email?: string;
   faculty: string;
   className: string;
   cohort: string;
@@ -64,6 +65,8 @@ export interface StudentBill {
 
 export interface StudentTicket {
   id: string;
+  studentId?: string;
+  assignedTo?: string;
   title: string;
   category: string;
   timeSent: string;

@@ -43,7 +43,7 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({
 
       if (res.success) {
         onUserAdded();
-        eventBus.emit(EVENTS.SHOW_TOAST, `Đã tạo tài khoản cho ${fullName} thành công!`);
+        eventBus.emit(EVENTS.SHOW_TOAST, `Đã tạo tài khoản ${fullName}. Mật khẩu tạm: ${res.temporaryPassword}`);
         onClose();
       } else {
         setError(res.error || 'Có lỗi xảy ra.');
